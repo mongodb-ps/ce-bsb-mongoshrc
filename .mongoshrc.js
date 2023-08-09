@@ -1,52 +1,109 @@
 
-
-function getAllDatabases() {
+function getAllDatabases(pattern) {
   var databases = [];
   db.getMongo().getDBNames().forEach(function(database) {
-    if (database != 'admin' && database != 'local' && database != 'config') {
+    if (database != 'admin' && database != 'local' && database != 'config' && pattern !== null && database.match(pattern)) {
       databases.push(database);
     }
   })
   return databases;
 }
 
-function getAllNameSpaces() {
+function getAllNameSpaces(pattern) {
   var namespaces = [];
   getAllDatabases().forEach(function(database) {
     db.getSiblingDB(database).getCollectionNames().forEach(function(collection) {
-      namespaces.push({ 'db': database, 'col': collection})
+      var ns = database + '.' + collection;
+      if ( pattern == null || ns.match(pattern) ) {
+        namespaces.push(database + '.' + collection)
+      }
     })
   });
   return namespaces;
 }
 
-function getCollection(ns) {
-  if ((ns.db !== null && ns.db !== '') && (ns.col !== null && ns.col !== '')) {
-    coll = db.getSiblingDB(ns.db)[ns.col];
-  }
-  return coll;
+function getAllCollections(pattern) {
+  var databases = [];
+  getAllDatabases().forEach(function(database) {
+    var dbObj = { "db": database, "col": [] }
+    db.getSiblingDB(database).getCollectionNames().forEach(function(collection) {
+      var ns = database + '.' + collection;
+      if ( pattern == null || ns.match(pattern) ) {
+        dbObj.col.push(collection)
+      }
+    });
+    if (dbObj.col.length > 0) {
+      databases.push(dbObj);
+    }
+  });
+  return databases;
 }
 
-function dropAllDatabases() {
-  getAllDatabases().forEach(function(database) {
+function getCollection(namespace) {
+  var ns = namespace.split(".");
+  var database = ns[0];
+  var collection = ns[1];
+  if (database !== null && collection !== null) {
+    collection = db.getSiblingDB(database)[collection];
+  }
+  return collection;
+}
+
+function dropAllDatabases(pattern) {
+  getAllDatabases(pattern).forEach(function(database) {
     db.getSiblingDB(database).dropDatabase();
   });
 }
 
-function getAllIndexes() {
-  var indexes = {}
-  getAllNameSpaces().forEach(function(ns) {
-    if (!(ns.db in indexes)){
-      indexes[ns.db] = {}
-    }
-    indexes[ns.db][ns.col] = getCollection(ns).getIndexes();  
+function setProfilingLevelAllDatabases(level, msThreshold, pattern) {
+  if (level == null){
+    level = 0;
+  }
+  if (msThreshold == null){
+    msThreshold = 100;
+  }
+  getAllDatabases(pattern).forEach(function(database) {
+    db.getSiblingDB(database).setProfilingLevel(level, msThreshold);
+  });
+}
+
+function dropAllCollections(pattern) {
+  getAllNameSpaces(pattern).forEach(function(ns) {
+    getCollection(ns).drop()
+  });
+}
+
+function dropAllCollections(pattern) {
+  getAllNameSpaces(pattern).forEach(function(ns) {
+    getCollection(ns).drop()
+  });
+}
+
+function getProfilingStatusAllDatabases(pattern) {
+  var profilingStatuses = [];
+  getAllDatabases(pattern).forEach(function(database) {
+    var dbObj = { "db": database }
+    dbObj.profilingStatus = db.getSiblingDB(database).getProfilingStatus();
+    profilingStatuses.push(dbObj);
+  }); 
+  return profilingStatuses;
+}
+
+function getAllIndexes(pattern) {
+  var indexes = [];
+  getAllNameSpaces(pattern).forEach(function(ns) {
+    var dbObj = { "ns": ns }
+    dbObj.indexes = getCollection(ns).getIndexes();  
+    indexes.push(dbObj);
   }); 
   return indexes;
 }
 
-function dropAllIndexes() {
+function dropAllIndexes(pattern) {
   getAllNameSpaces().forEach(function(namespace) {
-    getCollection(namespace).dropIndexes();  
+    if ( pattern == null || namespace.match(pattern) ) {
+      getCollection(namespace).dropIndexes();  
+    }
   }); 
 }
 
