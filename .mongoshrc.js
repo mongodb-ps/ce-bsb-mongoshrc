@@ -50,8 +50,8 @@ function pluginHelp(pattern) {
     print("    Returns:");
     print("      [ <ns>, ... ]\n");
   }
-  if('getCollection'.match(namespace)) {
-    print("  getCollection(ns)");
+  if('getCollection'.match(pattern)) {
+    print("  getCollection(namespace)");
     print("    Parameters:");
     print("      namespace - <db>.<col>");
     print("    Returns:");
@@ -140,15 +140,11 @@ function getIndexes(nsPattern, idxPattern) {
   var results = [];
   getNameSpaces(nsPattern).forEach(function(ns) {
     var dbObj = { "ns": ns, "indexes": [] }
-    if(idxPattern == null) {
-      dbObj.indexes = getCollection(ns).getIndexes();  
-    } else {
-      getCollection(ns).getIndexes().forEach(function(idx) {
-        if (idx.name.match(idxPattern)) {
-          dbObj.indexes.push(idx);
-        }
-      });  
-    }
+    getCollection(ns).getIndexes().forEach(function(idx) {
+      if (JSON.stringify(idx).match(idxPattern)) {
+        dbObj.indexes.push(idx);
+      }
+    });  
     if(dbObj.indexes.length > 0) {
       results.push(dbObj);
     }
@@ -156,12 +152,12 @@ function getIndexes(nsPattern, idxPattern) {
   return results;
 }
 
-function getNameSpaces(pattern) {
+function getNameSpaces(nsPattern) {
   var namespaces = [];
   getDatabases().forEach(function(database) {
     db.getSiblingDB(database).getCollectionNames().forEach(function(collection) {
       var ns = database + '.' + collection;
-      if ( pattern == null || ns.match(pattern) ) {
+      if ( nsPattern == null || ns.match(nsPattern) ) {
         namespaces.push(database + '.' + collection)
       }
     })
