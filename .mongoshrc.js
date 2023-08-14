@@ -108,23 +108,17 @@ function dropDatabases(pattern) {
 
 function dropIndexes(nsPattern, idxPattern) {
   ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    if(idxPattern == null) {
-      getNameSpaces(nsPattern).forEach(function(ns) {
-        var dbObj = { "ns": ns }
-        dbObj.result = getCollection(ns).dropIndexes();  
-        results.push(dbObj);
-      });
-    } else {
-      getIndexes(nsPattern, idxPattern).forEach(function(ns) {
-        var dbObj = { "ns": ns.ns, result: [] }
-        ns.indexes.forEach(function(idx) {
-          dbObj.result.push(getCollection(ns.ns).dropIndex(idx.name));
-        }); 
-        results.push(dbObj);
-      });
-    }
+    getIndexes(nsPattern, idxPattern).result.forEach(function(nsObj) {
+      var dbObj = { "ns": nsObj.ns, result: [] }
+      nsObj.indexes.forEach(function(idx) {
+        if(idx.name !== '_id_') {
+          dbObj.result.push(getCollection(nsObj.ns).dropIndex(idx.name));
+        }
+      }); 
+      ret.result.push(dbObj);
+    });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
