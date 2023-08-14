@@ -76,11 +76,15 @@ function pluginHelp(pattern) {
 function dropCollections(nsPattern) {
   var ret = { ok: 1, result: [] }
   try {
-    getNameSpaces(nsPattern).result.forEach(function(ns) {
-      print("ns: " + ns);
-      dbObj = { "ns": ns }
-      dbObj.result = getCollection(ns).drop()
-      ret.result.push(dbObj);
+    getCollections(nsPattern).result.forEach(function(dbObjIn) {
+      var db = dbObjIn.db;
+      var dbObjOut = { db: db, cols: [] };
+      dbObjIn.cols.forEach(function(col) {
+        dbObjOut.cols.push({ col: col, dropped: getCollection(db + '.' + col).drop() });
+      });
+      if(dbObjOut.cols.length > 0) {
+        ret.result.push(dbObjOut);
+      }
     });
   } catch (error) {
     ret.ok = 0;
@@ -136,19 +140,19 @@ function getCollection(namespace) {
   return collection;
 }
 
-function getCollections(pattern) {
+function getCollections(nsPattern) {
   var ret = { ok: 1 }
   ret.result = [];
   try {
     getDatabases().result.forEach(function(database) {
-      var dbObj = { "db": database, "col": [] }
+      var dbObj = { "db": database, "cols": [] }
       getDatabase(database).getCollectionNames().forEach(function(collection) {
         var ns = database + '.' + collection;
-        if ( pattern == null || ns.match(pattern) ) {
-          dbObj.col.push(collection)
+        if ( nsPattern == null || ns.match(nsPattern) ) {
+          dbObj.cols.push(collection)
         }
       });
-      if (dbObj.col.length > 0) {
+      if (dbObj.cols.length > 0) {
         ret.result.push(dbObj);
       }
     });
