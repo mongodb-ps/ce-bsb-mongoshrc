@@ -199,6 +199,50 @@ function getIndexes(nsPattern, idxPattern) {
   return ret;
 }
 
+function getIndexStats(nsPattern, idxPattern) {
+  var ret = { ok: 1 }
+  ret.result = [];
+  try {
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
+      var dbObj = { "ns": ns, "indexes": [] }
+      getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
+        if (JSON.stringify(idx).match(idxPattern)) {
+          dbObj.indexes.push(idx);
+        }
+      });  
+      if(dbObj.indexes.length > 0) {
+        ret.result.push(dbObj);
+      }
+    }); 
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+function getUnusedIndexes(nsPattern) {
+  var ret = { ok: 1 }
+  ret.result = [];
+  try {
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
+      var dbObj = { "ns": ns, "indexes": [] }
+      getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
+        if (JSON.stringify(idx).match(/"accesses":{"ops":{"low":0,"high":0,"unsigned":false}/)) {
+          dbObj.indexes.push(idx);
+        }
+      });  
+      if(dbObj.indexes.length > 0) {
+        ret.result.push(dbObj);
+      }
+    }); 
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
 function getNameSpaces(nsPattern) {
   var ret = { ok: 1 }
   ret.result = [];
