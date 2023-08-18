@@ -2,25 +2,37 @@
 function pluginHelp(pattern) {
   print(".mongoshrc Plug In Help:\n");
   if('dropCollections'.match(pattern)) {
-    print("  dropCollections(pattern)");
+    print("  dropCollections(nsPattern)");
+    print("    Description:");
+    print("      Drops multiple collections depending on the regex pattern matching the namespace.");
+    print("      Use getCollections() to confirm collections to be dropped.");
     print("    Parameters:");
-    print("      pattern - regex/string to limit collections/namespaces dropped");
+    print("      nsPattern - regex/string to limit collections/namespaces dropped");
     print("    Returns:");
-    print("      [ { db: <db>, profilingStatus: <profilingStatus> } ]\n");
+    print("      [ { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] } ]\n");
   }
   if('dropDatabases'.match(pattern)) {
     print("  dropDatabases(pattern)");
+    print("    Description:");
+    print("      Drops multiple databases depending on the regex pattern matching database name.");
+    print("      Use getDatabases() to confirm databases to be dropped.");
     print("    Parameters:");
     print("      pattern - regex/string to limit databases dropped");
     print("    Returns:");
+    print("      [ { ok: ..., err: <error>, results: [ { ok: 1, dropped: 'sample_weatherdata' } ] } ]\n");
     print("      \n");
   }
-  if('dropIndexes'.match(pattern)) {
+  if('dropIndexes'.match(nsPattern, idxPattern)) {
     print("  dropIndexes(pattern)");
+    print("    Description:");
+    print("      Drops multiple indexes across namespaces matching the nsPattern (regex) and");
+    print("      matching the idxPattern such as name or option.");
+    print("      Use getIndexes() to confirm indexes to be dropped.");
     print("    Parameters:");
-    print("      pattern - regex/string to limit namespaces");
+    print("      nsPattern - regex/string to limit namespaces");
+    print("      idxPattern - regex/string to indexes");
     print("    Returns:");
-    print("      [ { ns: <db>.<col>, indexes: <indexes> } ]\n");
+    print("      [ { ok: ..., err: <error>, result: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., '$clusterTime': { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] } } ]\n");
   }
   if('getCollections'.match(pattern)) {
     print("  getCollections(pattern)");
@@ -74,16 +86,16 @@ function pluginHelp(pattern) {
 }
 
 function dropCollections(nsPattern) {
-  var ret = { ok: 1, result: [] }
+  var ret = { ok: 1, results: [] }
   try {
-    getCollections(nsPattern).result.forEach(function(dbObjIn) {
+    getCollections(nsPattern).results.forEach(function(dbObjIn) {
       var db = dbObjIn.db;
       var dbObjOut = { db: db, cols: [] };
       dbObjIn.cols.forEach(function(col) {
         dbObjOut.cols.push({ col: col, dropped: getCollection(db + '.' + col).drop() });
       });
       if(dbObjOut.cols.length > 0) {
-        ret.result.push(dbObjOut);
+        ret.results.push(dbObjOut);
       }
     });
   } catch (error) {
@@ -94,10 +106,10 @@ function dropCollections(nsPattern) {
 }
 
 function dropDatabases(pattern) {
-  var ret = { ok: 1, result: [] };
+  var ret = { ok: 1, results: [] };
   try {
-    getDatabases(pattern).result.forEach(function(database) {
-      ret.result.push(getDatabase(database).dropDatabase());
+    getDatabases(pattern).results.forEach(function(database) {
+      ret.results.push(getDatabase(database).dropDatabase());
     });
   } catch (error) {
     ret.ok = 0;
@@ -108,16 +120,16 @@ function dropDatabases(pattern) {
 
 function dropIndexes(nsPattern, idxPattern) {
   ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
-    getIndexes(nsPattern, idxPattern).result.forEach(function(nsObj) {
-      var dbObj = { "ns": nsObj.ns, result: [] }
+    getIndexes(nsPattern, idxPattern).results.forEach(function(nsObj) {
+      var dbObj = { "ns": nsObj.ns, results: [] }
       nsObj.indexes.forEach(function(idx) {
         if(idx.name !== '_id_') {
-          dbObj.result.push(getCollection(nsObj.ns).dropIndex(idx.name));
+          dbObj.results.push(getCollection(nsObj.ns).dropIndex(idx.name));
         }
       }); 
-      ret.result.push(dbObj);
+      ret.results.push(dbObj);
     });
   } catch (error) {
     ret.ok = 0;
@@ -136,9 +148,9 @@ function getCollection(namespace) {
 
 function getCollections(nsPattern) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
-    getDatabases().result.forEach(function(database) {
+    getDatabases().results.forEach(function(database) {
       var dbObj = { "db": database, "cols": [] }
       getDatabase(database).getCollectionNames().forEach(function(collection) {
         var ns = database + '.' + collection;
@@ -147,7 +159,7 @@ function getCollections(nsPattern) {
         }
       });
       if (dbObj.cols.length > 0) {
-        ret.result.push(dbObj);
+        ret.results.push(dbObj);
       }
     });
   } catch (error) {
@@ -163,11 +175,11 @@ function getDatabase(database) {
 
 function getDatabases(dbPattern) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
     db.getMongo().getDBNames().forEach(function(database) {
       if (database != 'admin' && database != 'local' && database != 'config' && dbPattern !== null && database.match(dbPattern)) {
-        ret.result.push(database);
+        ret.results.push(database);
       }
     });
   } catch (error) {
@@ -179,9 +191,9 @@ function getDatabases(dbPattern) {
 
 function getIndexes(nsPattern, idxPattern) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
-    getNameSpaces(nsPattern).result.forEach(function(ns) {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
       getCollection(ns).getIndexes().forEach(function(idx) {
         if (JSON.stringify(idx).match(idxPattern)) {
@@ -189,7 +201,7 @@ function getIndexes(nsPattern, idxPattern) {
         }
       });  
       if(dbObj.indexes.length > 0) {
-        ret.result.push(dbObj);
+        ret.results.push(dbObj);
       }
     }); 
   } catch (error) {
@@ -201,9 +213,9 @@ function getIndexes(nsPattern, idxPattern) {
 
 function getIndexStats(nsPattern, idxPattern) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
-    getNameSpaces(nsPattern).result.forEach(function(ns) {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
       getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
         if (JSON.stringify(idx).match(idxPattern)) {
@@ -211,7 +223,7 @@ function getIndexStats(nsPattern, idxPattern) {
         }
       });  
       if(dbObj.indexes.length > 0) {
-        ret.result.push(dbObj);
+        ret.results.push(dbObj);
       }
     }); 
   } catch (error) {
@@ -223,9 +235,9 @@ function getIndexStats(nsPattern, idxPattern) {
 
 function getUnusedIndexes(nsPattern) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
-    getNameSpaces(nsPattern).result.forEach(function(ns) {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
       getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
         if (JSON.stringify(idx).match(/"accesses":{"ops":{"low":0,"high":0,"unsigned":false}/)) {
@@ -233,7 +245,7 @@ function getUnusedIndexes(nsPattern) {
         }
       });  
       if(dbObj.indexes.length > 0) {
-        ret.result.push(dbObj);
+        ret.results.push(dbObj);
       }
     }); 
   } catch (error) {
@@ -245,13 +257,13 @@ function getUnusedIndexes(nsPattern) {
 
 function getNameSpaces(nsPattern) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   try {
-    getDatabases().result.forEach(function(database) {
+    getDatabases().results.forEach(function(database) {
       getDatabase(database).getCollectionNames().forEach(function(collection) {
         var ns = database + '.' + collection;
         if ( nsPattern == null || ns.match(nsPattern) ) {
-          ret.result.push(database + '.' + collection)
+          ret.results.push(database + '.' + collection)
         }
       })
     });
@@ -264,12 +276,12 @@ function getNameSpaces(nsPattern) {
 
 function getProfilingStatuses(nsPattern) {
   var ret = { ok: 1 };
-  ret.result = [];
+  ret.results = [];
   try {
-    getDatabases(nsPattern).result.forEach(function(database) {
+    getDatabases(nsPattern).results.forEach(function(database) {
       var dbObj = { "db": database };
       dbObj.profilingStatus = getDatabase(database).getProfilingStatus();
-      ret.result.push(dbObj);
+      ret.results.push(dbObj);
     }); 
   } catch (error) {
     ret.ok = 0;
@@ -280,7 +292,7 @@ function getProfilingStatuses(nsPattern) {
 
 function setProfilingLevels(nsPattern, level, msThreshold) {
   var ret = { ok: 1 }
-  ret.result = [];
+  ret.results = [];
   if (level == null){
     level = 0;
   }
@@ -288,10 +300,10 @@ function setProfilingLevels(nsPattern, level, msThreshold) {
     msThreshold = 100;
   }
   try {
-    getDatabases(nsPattern).result.forEach(function(database) {
+    getDatabases(nsPattern).results.forEach(function(database) {
       var dbObj = { "db": database } 
       dbObj.profilingStatus = getDatabase(database).setProfilingLevel(level, msThreshold);
-      ret.result.push(dbObj);
+      ret.results.push(dbObj);
     });
   } catch (error) {
     ret.ok = 0;
