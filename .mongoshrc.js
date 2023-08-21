@@ -1,85 +1,101 @@
 
-function pluginHelp(pattern) {
+function getHelp(pattern) {
   print(".mongoshrc Plug In Help:\n");
   if('dropCollections'.match(pattern)) {
-    print("  dropCollections(nsPattern)");
-    print("    Description:");
-    print("      Drops multiple collections depending on the regex pattern matching the namespace.");
-    print("      Use getCollections() to confirm collections to be dropped.");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit collections/namespaces dropped");
-    print("    Returns:");
-    print("      [ { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] } ]\n");
+    print('  dropCollections(nsPattern)');
+    print('    Description:');
+    print('      Drops multiple collections depending on the regex pattern matching the namespace.');
+    print('      Use getCollections() to confirm collections to be dropped.');
+    print('    Parameters:');
+    print('      nsPattern - regex/string to limit collections/namespaces dropped');
+    print('    Returns:');
+    print('      [ { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] } ]\n');
   }
   if('dropDatabases'.match(pattern)) {
-    print("  dropDatabases(pattern)");
-    print("    Description:");
-    print("      Drops multiple databases depending on the regex pattern matching database name.");
-    print("      Use getDatabases() to confirm databases to be dropped.");
-    print("    Parameters:");
-    print("      pattern - regex/string to limit databases dropped");
-    print("    Returns:");
-    print("      [ { ok: ..., err: <error>, results: [ { ok: 1, dropped: 'sample_weatherdata' } ] } ]\n");
-    print("      \n");
+    print('  dropDatabases(pattern)');
+    print('    Description:');
+    print('      Drops multiple databases depending on the regex pattern matching database name.');
+    print('      Use getDatabases() to confirm databases to be dropped.');
+    print('    Parameters:');
+    print('      pattern - regex/string to limit databases dropped');
+    print('    Returns:');
+    print('      [ { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] } ]\n');
+    print('      \n');
   }
-  if('dropIndexes'.match(nsPattern, idxPattern)) {
-    print("  dropIndexes(pattern)");
-    print("    Description:");
-    print("      Drops multiple indexes across namespaces matching the nsPattern (regex) and");
-    print("      matching the idxPattern such as name or option.");
-    print("      Use getIndexes() to confirm indexes to be dropped.");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit namespaces");
-    print("      idxPattern - regex/string to indexes");
-    print("    Returns:");
-    print("      [ { ok: ..., err: <error>, result: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., '$clusterTime': { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] } } ]\n");
+  if('dropIndexes'.match(pattern)) {
+    print('  dropIndexes(nsPattern, idxPattern)');
+    print('    Description:');
+    print('      Drops multiple indexes across namespaces matching the nsPattern (regex) and');
+    print('      matching the idxPattern such as name or option.');
+    print('      Use getIndexes() to confirm indexes to be dropped.');
+    print('    Parameters:');
+    print('      nsPattern - regex/string to limit namespaces');
+    print('      idxPattern - regex/string to indexes');
+    print('    Returns:');
+    print('      [ { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] } } ]\n');
   }
   if('getCollections'.match(pattern)) {
-    print("  getCollections(pattern)");
-    print("    Parameters:");
-    print("      pattern - regex/string to limit databases returned");
-    print("    Returns:");
-    print("      [ { db: <db>, col: [ <col>, ...], ... ]\n");
+    print('  getCollections(nsPattern)');
+    print('    Description:');
+    print('      Get collections based upon the namespace pattern (regex).');
+    print('    Parameters:');
+    print('      nsPattern - regex/string to limit databases/collections returned');
+    print('    Returns:');
+    print('      [ { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } ]\n');
   }
   if('getDatabases'.match(pattern)) {
-    print("  getDatabases(pattern)");
+    print("  getDatabases(dbPattern)");
+    print("    Description:");
+    print("      Get databases based upon the dbPattern (regex).");
     print("    Parameters:");
-    print("      pattern - regex/string to limit databases returned");
+    print("      dbPattern - regex/string to limit databases returned");
     print("    Returns:");
     print("      [ ok: [10], msg: '...', err: '...', results: [<db>, ...] ]\n");
   }
   if('getIndexes'.match(pattern)) {
-    print("  getIndexes(pattern)");
+    print("  getIndexes(nsPattern, idxPattern)");
+    print("    Description:");
+    print("      Get indexes based upon the nsPattern (regex).");
+    print("      idxPattern allows you to scan the index for the name, parameters, etc.");
     print("    Parameters:");
-    print("      pattern - regex/string to limit namespaces");
+    print("      nsPattern - regex/string to limit namespaces");
+    print("      idxPattern - regex/string to limit indexes");
     print("    Returns:");
-    print("      [ { ns: <db>.<col>, indexes: <indexes> } ]\n");
+    print("      [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ]\n");
   }
   if('getNameSpaces'.match(pattern)) {
-    print("  getNameSpaces(pattern)");
+    print("  getNameSpaces(nsPattern)");
+    print("    Description:");
+    print("      Get namespaces based upon the nsPattern (regex).");
     print("    Parameters:");
-    print("      pattern - regex/string to limit databases returned");
+    print("      nsPattern - regex/string to limit databases returned");
     print("    Returns:");
     print("      [ <ns>, ... ]\n");
   }
   if('getCollection'.match(pattern)) {
     print("  getCollection(namespace)");
+    print("    Description:");
+    print("      Gets a collection based upon the namespace.");
     print("    Parameters:");
     print("      namespace - <db>.<col>");
     print("    Returns:");
     print("      <collectionObject\n");
   }
   if('getProfilingStatus'.match(pattern)) {
-    print("  getProfilingStatus(pattern)");
+    print("  getProfilingStatuses(nsPattern)");
+    print("    Description:");
+    print("      Gets the profiling status for all namespaces based upon the nsPattern (regex).");
     print("    Parameters:");
-    print("      pattern - regex/string to limit databases");
+    print("      nsPattern - regex/string to limit databases");
     print("    Returns:");
     print("      [ { db: <db>, profilingStatus: <profilingStatus> } ]\n");
   }
   if('setProfilingLevel'.match(pattern)) {
-    print("  setProfilingLevel(pattern)");
+    print("  setProfilingLevels(nsPattern)");
+    print("    Description:");
+    print("      Sets the profiling status for all namespaces based upon the nsPattern (regex).");
     print("    Parameters:");
-    print("      pattern - regex/string to limit databases returned");
+    print("      nsPattern - regex/string to limit databases returned");
     print("    Returns:");
     print("      [ { db: <db>, profilingStatus: <profilingStatus> } ]\n");
   }
