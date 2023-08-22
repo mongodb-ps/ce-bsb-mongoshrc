@@ -9,7 +9,7 @@ function getHelp(pattern) {
     print('    Parameters:');
     print('      nsPattern - regex/string to limit collections/namespaces dropped');
     print('    Returns:');
-    print('      [ { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] } ]\n');
+    print('      { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] }\n');
   }
   if('dropDatabases'.match(pattern)) {
     print('  dropDatabases(pattern)');
@@ -19,7 +19,7 @@ function getHelp(pattern) {
     print('    Parameters:');
     print('      pattern - regex/string to limit databases dropped');
     print('    Returns:');
-    print('      [ { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] } ]\n');
+    print('      { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] }\n');
     print('      \n');
   }
   if('dropIndexes'.match(pattern)) {
@@ -32,7 +32,16 @@ function getHelp(pattern) {
     print('      nsPattern - regex/string to limit namespaces');
     print('      idxPattern - regex/string to indexes');
     print('    Returns:');
-    print('      [ { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] } } ]\n');
+    print('      { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] }\n');
+  }
+  if('getCollection'.match(pattern)) {
+    print("  getCollection(namespace)");
+    print("    Description:");
+    print("      Gets a collection based upon the namespace.");
+    print("    Parameters:");
+    print("      namespace - <db>.<col>");
+    print("    Returns:");
+    print("      <collectionObject>\n");
   }
   if('getCollections'.match(pattern)) {
     print('  getCollections(nsPattern)');
@@ -41,7 +50,16 @@ function getHelp(pattern) {
     print('    Parameters:');
     print('      nsPattern - regex/string to limit databases/collections returned');
     print('    Returns:');
-    print('      [ { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } ]\n');
+    print('      { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } }\n');
+  }
+  if('getCreateIndexCommands'.match(pattern)) {
+    print("  setProfilingLevels(nsPattern)");
+    print("    Description:");
+    print("      Sets the profiling status for all namespaces based upon the nsPattern (regex).");
+    print("    Parameters:");
+    print("      nsPattern - regex/string to limit databases returned");
+    print("    Returns:");
+    print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
   }
   if('getDatabases'.match(pattern)) {
     print("  getDatabases(dbPattern)");
@@ -50,7 +68,7 @@ function getHelp(pattern) {
     print("    Parameters:");
     print("      dbPattern - regex/string to limit databases returned");
     print("    Returns:");
-    print("      [ ok: [10], msg: '...', err: '...', results: [<db>, ...] ]\n");
+    print("      { ok: ..., err: <error>, results: [<db>, ...] }\n");
   }
   if('getIndexes'.match(pattern)) {
     print("  getIndexes(nsPattern, idxPattern)");
@@ -61,7 +79,7 @@ function getHelp(pattern) {
     print("      nsPattern - regex/string to limit namespaces");
     print("      idxPattern - regex/string to limit indexes");
     print("    Returns:");
-    print("      [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ]\n");
+    print("      { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }\n");
   }
   if('getNameSpaces'.match(pattern)) {
     print("  getNameSpaces(nsPattern)");
@@ -70,16 +88,7 @@ function getHelp(pattern) {
     print("    Parameters:");
     print("      nsPattern - regex/string to limit databases returned");
     print("    Returns:");
-    print("      [ <ns>, ... ]\n");
-  }
-  if('getCollection'.match(pattern)) {
-    print("  getCollection(namespace)");
-    print("    Description:");
-    print("      Gets a collection based upon the namespace.");
-    print("    Parameters:");
-    print("      namespace - <db>.<col>");
-    print("    Returns:");
-    print("      <collectionObject\n");
+    print("      { ok: ..., err: <error>, results: [ <ns>, ... ] }\n");
   }
   if('getProfilingStatus'.match(pattern)) {
     print("  getProfilingStatuses(nsPattern)");
@@ -88,7 +97,17 @@ function getHelp(pattern) {
     print("    Parameters:");
     print("      nsPattern - regex/string to limit databases");
     print("    Returns:");
-    print("      [ { db: <db>, profilingStatus: <profilingStatus> } ]\n");
+    print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
+  }
+  if('setBalancing'.match(pattern)) {
+    print("  setBalancing(nsPattern, enable)");
+    print("    Description:");
+    print("      Enables/Disables balancing for namespaces based upon the nsPattern (regex).");
+    print("    Parameters:");
+    print("      nsPattern - regex/string to limit databases returned");
+    print("      enable - boolean - true/false");
+    print("    Returns:");
+    print("      { ok: ..., err: <error>, results: [ { db: <db>, results: <enable/disable-result> } ] }\n");
   }
   if('setProfilingLevel'.match(pattern)) {
     print("  setProfilingLevels(nsPattern)");
@@ -97,7 +116,7 @@ function getHelp(pattern) {
     print("    Parameters:");
     print("      nsPattern - regex/string to limit databases returned");
     print("    Returns:");
-    print("      [ { db: <db>, profilingStatus: <profilingStatus> } ]\n");
+    print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
   }
 }
 
@@ -307,8 +326,7 @@ function getProfilingStatuses(nsPattern) {
 }
 
 function setProfilingLevels(nsPattern, level, msThreshold) {
-  var ret = { ok: 1 }
-  ret.results = [];
+  var ret = { ok: 1, results: [] };
   if (level == null){
     level = 0;
   }
@@ -333,4 +351,77 @@ function splitNameSpace(namespace) {
   var collection = namespace.substr(namespace.match(/\./).index+1);
   return { db: database, col: collection }
 }
+
+function getCreateIndexCommands(nsPattern, idxPattern) {
+  var ret = { ok: 1, results: [], string: '' };
+  getIndexes(nsPattern, idxPattern).results.forEach(function(namespace) {
+    var result = { ns: namespace.ns, commands: [] };
+    var ns = splitNameSpace(namespace.ns)
+    namespace.indexes.forEach(function(index) {
+      if(index.name !== '_id_') {
+        delete index.v;
+        idxKey = index.key;
+        delete index.key;
+        command = 'db.getSiblingDB("' + ns.db + '").' + ns.col + '.createIndex(' + JSON.stringify(idxKey) + ',' + JSON.stringify(index) + ')';
+        result.commands.push(command);
+        ret.string += command + "\n";
+      }
+    });
+    if(result.commands.length > 0){
+      ret.results.push(result);
+    }
+  });
+  return ret;
+}
+
+function setBalancing(nsPattern, enable) {
+  var ret = { ok: 1, results: [] };
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
+      stats = getCollection(ns).stats()
+      if (stats.hasOwnProperty('shards') ) {
+        if(enable === true) {
+          ret.results.push(sh.enableBalancing(ns));
+        } else {
+          ret.results.push(sh.disableBalancing(ns));
+        }
+      }
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+//function getTTLIndexSettings() {
+//  db.getMongo().getDBNames().forEach(function(database) {
+//  if (database != 'admin' && database != 'local' && database != 'config') {
+//    db.getSiblingDB(database).getCollectionNames().forEach(function(collection) {
+//      indexes = db.getSiblingDB(database)[collection].getIndexes()
+//      indexes.forEach(function(index) {
+//        if(index.hasOwnProperty('expireAfterSeconds')){
+//          command = {
+//            collMod: collection,
+//            index: {
+//              keyPattern: index.key,
+//              expireAfterSeconds: index.expireAfterSeconds
+//            }
+//          }
+//          print('db.getSiblingDB("' + database + '").runCommand(' + JSON.stringify(command) + ')');
+//        }
+//      });
+//    });
+//  }});
+//}
+
+//db.runCommand(
+//  {
+//    collMod: <collection>,
+//    index: {
+//      keyPattern: { <field>: 1 },
+//      expireAfterSeconds: <secs>
+//    }
+//  }
+//)
 
