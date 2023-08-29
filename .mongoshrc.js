@@ -1,6 +1,18 @@
 
 function getHelp(pattern) {
   print(".mongoshrc Plug In Help:\n");
+  if('dbFind'.match(pattern)) {
+    print("  dbFind(nsPattern, query, proj, sort)");
+    print("    Description:");
+    print("      Runs a query across namespaces based upon the nsPattern (regex).");
+    print("    Parameters:");
+    print("      nsPattern - regex/string to limit namespaces");
+    print("      query     - (optional) query to run against each namespace");
+    print("      proj      - (optional) projection of the results");
+    print("      sort      - (optional) sort the results for each query");
+    print("    Returns:");
+    print("      { ok: ..., err: <error>, results: [ { ns: <ns>, results: [<query-results>] ] }\n");
+  }
   if('dropCollections'.match(pattern)) {
     print('  dropCollections(nsPattern)');
     print('    Description:');
@@ -120,6 +132,32 @@ function getHelp(pattern) {
   }
 }
 
+// Utilities
+function dbRunCommand(optDocument)
+{
+  return getDatabase('admin').runCommand(optDocument);
+}
+
+function dbAdminCommand(optDocument)
+{
+  return getDatabase('admin').adminCommand(optDocument);
+}
+
+function getCollection(namespace) {
+  var ns = splitNameSpace(namespace)
+  if (ns.db !== null && ns.col !== null) {
+    collection = getDatabase(ns.db)[ns.col];
+  }
+  return collection;
+}
+
+function getDatabase(database) {
+  return db.getSiblingDB(database);
+}
+
+
+// Get/Drop commands
+
 function dropCollections(nsPattern) {
   var ret = { ok: 1, results: [] }
   try {
@@ -173,14 +211,6 @@ function dropIndexes(nsPattern, idxPattern) {
   return ret;
 }
 
-function getCollection(namespace) {
-  var ns = splitNameSpace(namespace)
-  if (ns.db !== null && ns.col !== null) {
-    collection = getDatabase(ns.db)[ns.col];
-  }
-  return collection;
-}
-
 function getCollections(nsPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -202,10 +232,6 @@ function getCollections(nsPattern) {
     ret.err = error;
   }
   return ret;
-}
-
-function getDatabase(database) {
-  return db.getSiblingDB(database);
 }
 
 function getDatabases(dbPattern) {
@@ -346,6 +372,19 @@ function setProfilingLevels(nsPattern, level, msThreshold) {
   return ret;
 }
 
+function dbFind(nsPattern, query = {}, proj = {}, sort = {}) {
+  var ret = { ok: 1, results: [] };
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
+      ret.results.push({ "ns": ns, results: getCollection(ns).find(query, proj).sort(sort).toArray() });
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
 function splitNameSpace(namespace) {
   var database = namespace.substr(0,namespace.match(/\./).index);
   var collection = namespace.substr(namespace.match(/\./).index+1);
@@ -394,34 +433,97 @@ function setBalancing(nsPattern, enable) {
   return ret;
 }
 
-//function getTTLIndexSettings() {
-//  db.getMongo().getDBNames().forEach(function(database) {
-//  if (database != 'admin' && database != 'local' && database != 'config') {
-//    db.getSiblingDB(database).getCollectionNames().forEach(function(collection) {
-//      indexes = db.getSiblingDB(database)[collection].getIndexes()
-//      indexes.forEach(function(index) {
-//        if(index.hasOwnProperty('expireAfterSeconds')){
-//          command = {
-//            collMod: collection,
-//            index: {
-//              keyPattern: index.key,
-//              expireAfterSeconds: index.expireAfterSeconds
-//            }
-//          }
-//          print('db.getSiblingDB("' + database + '").runCommand(' + JSON.stringify(command) + ')');
-//        }
-//      });
-//    });
-//  }});
-//}
+// Keyhole
 
-//db.runCommand(
-//  {
-//    collMod: <collection>,
-//    index: {
-//      keyPattern: { <field>: 1 },
-//      expireAfterSeconds: <secs>
-//    }
-//  }
-//)
+function getBuildInfo() {
+  var ret = { ok: 1 };
+  try {
+    ret.results = getDatabase('admin').runCommand({ buildInfo: 1});
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+// FIXIT
+function getCollStats(nsPattern) {
+  var ret = { ok: 1 };
+  try {
+//    ret.results = getDatabase('admin').runCommand({ buildInfo: 1});
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+// FIXIT: Catch sharded cluster!
+function getConnPoolStats() {
+  var ret = { ok: 1, results: [] };
+  try {
+    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+function getHostInfo () {
+  var ret = { ok: 1 };
+  try {
+    ret.results = getDatabase('admin').adminCommand({ hostInfo: 1});
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+function getLog (logPattern, type = 'global') {
+  var ret = { ok: 1 };
+  try {
+    var log = getDatabase('admin').adminCommand({ getLog: type });
+    if("log" in log) {
+      var logs = log.log;
+      log.log = [];
+      logs.forEach(function (entry) {
+        if (entry.match(logPattern)) {
+          log.log.push(entry);
+        }
+      });
+    }
+    ret.results = log;
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+function getStartupWarnings () {
+  var ret = { ok: 1 };
+  try {
+    ret.results = getDatabase('admin').adminCommand({ getLog: 'startupWarnings' });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+
+function getCmdLineOpts () {
+  ret = { ok: 1 };
+  try {
+    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+
+}
+
 
