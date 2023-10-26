@@ -238,8 +238,8 @@ function getEstimatedDocumentCounts(nsPattern) {
   var ret = { ok: 1 }
   ret.results = [];
   try {
-    getNameSpaces(nsPattern).results.forEach(function(ns) {
-      ret.results.push({ "ns": ns, "count": getCollection(ns).estimatedDocumentCount() });
+    getNameSpaces(nsPattern).results.forEach(function(namespace) {
+      ret.results.push({ "ns": namespace, "count": getCollection(namespace).estimatedDocumentCount() });
     }); 
   } catch (error) {
     ret.ok = 0;
@@ -560,7 +560,7 @@ function addTime(startTime, seconds) {
   return retTime;
 }
 
-function tailLog(logPattern, secRunTime = (10 * 60), msMaxWait = 1000) {
+function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
   var logs = [];
   var sTime = ISODate();
   sTime.setTime(0);
@@ -570,9 +570,9 @@ function tailLog(logPattern, secRunTime = (10 * 60), msMaxWait = 1000) {
   var pTime = ISODate();
   pTime.setTime(0);
 
-  secRunTime *= 1000;
+  var msRunTime = sRunTime * 1000;
 
-  while(secRunTime > 0) {
+  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
     logs = getLog(logPattern).results.log;
 
     logs.forEach(function(val, idx) {
@@ -589,7 +589,42 @@ function tailLog(logPattern, secRunTime = (10 * 60), msMaxWait = 1000) {
     int = Math.min(msMaxWait,diffTime(eTime, sTime) || msMaxWait);
 
     sleep(int);
-    secRunTime -= int;
+    if (sRunTime !== undefined && sRunTime !== null) {
+      msRunTime -= int;
+    }
     sTime = eTime;
+  }
+}
+
+function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
+  var logs = [];
+  var int = 1000;
+  var pTime = ISODate();
+  pTime.setTime(0);
+
+  var msRunTime = sRunTime * 1000;
+  var counts = [];
+
+  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
+    var latestCounts = getEstimatedDocumentCounts(nsPattern).results;
+
+    latestCounts.forEach(function (item, idx) {
+      if (counts[idx] === undefined) {
+        counts[idx] = {};
+      }
+      counts[idx].ns = item.ns; 
+      counts[idx].count = item.count; 
+      if (!("start" in counts[idx])) {
+        counts[idx].start = item.count;
+      }
+      counts[idx].change = item.count - counts[idx].start;
+    });
+
+    print (counts);
+
+    sleep(msPollTime);
+    if (sRunTime !== undefined && sRunTime !== null) {
+      msRunTime -= msPollTime;
+    }
   }
 }
