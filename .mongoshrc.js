@@ -234,6 +234,20 @@ function getCollections(nsPattern) {
   return ret;
 }
 
+function getEstimatedDocumentCounts(nsPattern) {
+  var ret = { ok: 1 }
+  ret.results = [];
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
+      ret.results.push({ "ns": ns, "count": getCollection(ns).estimatedDocumentCount() });
+    }); 
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
 function getDatabases(dbPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -490,7 +504,7 @@ function getLog (logPattern, type = 'global') {
       log.log = [];
       logs.forEach(function (entry) {
         if (entry.match(logPattern)) {
-          log.log.push(entry);
+          log.log.push(JSON.parse(entry));
         }
       });
     }
@@ -513,9 +527,8 @@ function getStartupWarnings () {
   return ret; 
 }
 
-
 function getCmdLineOpts () {
-  ret = { ok: 1 };
+  var ret = { ok: 1 };
   try {
     ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
   } catch (error) {
@@ -526,4 +539,57 @@ function getCmdLineOpts () {
 
 }
 
+function getBuildInfo() {
+  var ret = { ok: 1 };
+  try {
+    ret.results = getDatabase('admin').runCommand({ buildInfo: 1 });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
 
+function diffTime(endTime, startTime) {
+  return (endTime.getTime() - startTime.getTime());
+}
+
+function addTime(startTime, seconds) {
+  var retTime = ISODate();
+  retTime.setTime(startTime.getTime() + seconds);
+  return retTime;
+}
+
+function tailLog(logPattern, secRunTime = (10 * 60), msMaxWait = 1000) {
+  var logs = [];
+  var sTime = ISODate();
+  sTime.setTime(0);
+  var eTime = ISODate();
+  eTime.setTime(1000);
+  var int = 1000;
+  var pTime = ISODate();
+  pTime.setTime(0);
+
+  secRunTime *= 1000;
+
+  while(secRunTime > 0) {
+    logs = getLog(logPattern).results.log;
+
+    logs.forEach(function(val, idx) {
+      pTime = ISODate(val.t.$date);
+      if(pTime.getTime() > eTime.getTime()) {
+        print(val);
+      }
+    });
+
+    if (pTime > eTime) {
+      eTime = pTime;
+    }
+
+    int = Math.min(msMaxWait,diffTime(eTime, sTime) || msMaxWait);
+
+    sleep(int);
+    secRunTime -= int;
+    sTime = eTime;
+  }
+}
