@@ -564,6 +564,7 @@ function addTime(startTime, seconds) {
 }
 
 function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
+// CHRAN - DUP COUNT
   var logs = [];
   var sTime = ISODate();
   sTime.setTime(0);
@@ -617,6 +618,7 @@ function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
 function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
   return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
 }
+
 function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
   var logs = [];
   var int = 1000;
@@ -634,7 +636,9 @@ function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
         counts[idx] = {};
       }
       counts[idx].ns = item.ns; 
+      counts[idx].last = counts[idx].count;
       counts[idx].count = item.count; 
+      counts[idx].rate = counts[idx].count / counts[idx].last * 100;
       if (!("start" in counts[idx])) {
         counts[idx].start = item.count;
       }
