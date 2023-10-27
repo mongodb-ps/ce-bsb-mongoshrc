@@ -132,6 +132,9 @@ function getHelp(pattern) {
   }
 }
 
+// Spinner
+spinChars = ['|','/','-','\\' ];
+
 // Utilities
 function dbRunCommand(optDocument)
 {
@@ -569,11 +572,20 @@ function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
   var int = 1000;
   var pTime = ISODate();
   pTime.setTime(0);
+  var iSpin = 0;
+
+  var sId = 0;
+  var eId = 0;
 
   var msRunTime = sRunTime * 1000;
 
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
     logs = getLog(logPattern).results.log;
+
+    if(logs.length > 0) {
+      sId = logs[0].id;
+      eId = logs[logs.length - 1].id;
+    }
 
     logs.forEach(function(val, idx) {
       pTime = ISODate(val.t.$date);
@@ -586,9 +598,15 @@ function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
       eTime = pTime;
     }
 
-    int = Math.min(msMaxWait,diffTime(eTime, sTime) || msMaxWait);
+    if (sId == eId) {
+      int = 1000;
+    } else {
+      int = Math.min(msMaxWait,diffTime(eTime, sTime));
+    }
 
+//    process.stdout.write(spinChars[iSpin++ % 4]);
     sleep(int);
+//    process.stdout.write("\b");
     if (sRunTime !== undefined && sRunTime !== null) {
       msRunTime -= int;
     }
@@ -596,6 +614,9 @@ function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
   }
 }
 
+function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
+  return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
+}
 function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
   var logs = [];
   var int = 1000;
