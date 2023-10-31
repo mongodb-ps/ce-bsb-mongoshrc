@@ -130,10 +130,43 @@ function getHelp(pattern) {
     print("    Returns:");
     print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
   }
+  if('tailLog'.match(pattern)) {
+    print("  tailLog(logPattern, sRunTime)");
+    print("    Description:");
+    print("      Tails the internal log for sRunTime seconds looking for logPattern");
+    print("    Parameters:");
+    print("      logPattern - regex/string used to match the log entry");
+    print("      sRunTime - Seconds to run before exiting; omit to run continuously");
+    print("    Prints:");
+    print("      <log-entry>\n");
+    print("      ...\n");
+  }
+  if('watchCounts'.match(pattern)) {
+    print("  watchCounts(nsPattern, sRunTime, msPollTime)");
+    print("    Description:");
+    print("      Calls watchEstimatedDocumentCounts()");
+    print("      Watches the count changes on collections matching the pattern.");
+    print("    Parameters:");
+    print("      nsPattern - regex/string used to select databases/collections to watch");
+    print("      sRunTime - Seconds to run before exiting; omit to run continuously");
+    print("      msPollTime - ms between polling for counts (default: 1000)");
+    print("    Prints:");
+    print("      <log-entry>\n");
+    print("      ...\n");
+  }
+  if('watchEstimatedDocumentCounts'.match(pattern)) {
+    print("  watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime)");
+    print("    Description:");
+    print("      Watches the count changes on collections matching the pattern.");
+    print("    Parameters:");
+    print("      nsPattern - regex/string used to select databases/collections to watch");
+    print("      sRunTime - Seconds to run before exiting; omit to run continuously");
+    print("      msPollTime - ms between polling for counts (default: 1000)");
+    print("    Prints:");
+    print("      <log-entry>\n");
+    print("      ...\n");
+  }
 }
-
-// Spinner
-spinChars = ['|','/','-','\\' ];
 
 // Utilities
 function dbRunCommand(optDocument)
@@ -450,6 +483,86 @@ function setBalancing(nsPattern, enable) {
   return ret;
 }
 
+function tailLog(logPattern, sRunTime) {
+  var logs = [];
+  var lastTime = ISODate();
+  lastTime.setTime(0);
+  var printTime = ISODate();
+  printTime.setTime(0);
+
+  var int = 1000;
+
+  var msRunTime = sRunTime * 1000;
+  var dups = 0;
+
+  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
+    logs = getLog(logPattern).results.log;
+
+    dups = 0;
+    logs.forEach(function(val, idx) {
+      printTime = ISODate(val.t.$date);
+      if(printTime.getTime() > lastTime.getTime()) {
+        print(val);
+      } else {
+        dups++;
+      }
+    });
+
+    if(logs.length < 1024) {
+      int = 1000;
+    } else {
+      int = dups;
+    }
+
+    sleep(int);
+    if (sRunTime !== undefined && sRunTime !== null) {
+      msRunTime -= int;
+    }
+    lastTime = pTime;
+  }
+}
+
+function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
+  return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
+}
+
+function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
+  var logs = [];
+  var int = 1000;
+  var pTime = ISODate();
+  pTime.setTime(0);
+
+  var msRunTime = sRunTime * 1000;
+  var counts = [];
+
+  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
+    var latestCounts = getEstimatedDocumentCounts(nsPattern).results;
+
+    latestCounts.forEach(function (item, idx) {
+      if (counts[idx] === undefined) {
+        counts[idx] = {};
+      }
+      counts[idx].ns = item.ns; 
+      counts[idx].last = counts[idx].count;
+      counts[idx].count = item.count; 
+      counts[idx].rate = counts[idx].count - counts[idx].last;
+      if (!("start" in counts[idx])) {
+        counts[idx].start = item.count;
+      }
+      counts[idx].change = item.count - counts[idx].start;
+    });
+
+    counts.forEach(function (item) {
+      print (item);
+    });
+
+    sleep(msPollTime);
+    if (sRunTime !== undefined && sRunTime !== null) {
+      msRunTime -= msPollTime;
+    }
+  }
+}
+
 // Keyhole
 
 function getBuildInfo() {
@@ -563,93 +676,3 @@ function addTime(startTime, seconds) {
   return retTime;
 }
 
-function tailLog(logPattern, sRunTime, msMaxWait = 1000) {
-// CHRAN - DUP COUNT
-  var logs = [];
-  var sTime = ISODate();
-  sTime.setTime(0);
-  var eTime = ISODate();
-  eTime.setTime(1000);
-  var int = 1000;
-  var pTime = ISODate();
-  pTime.setTime(0);
-  var iSpin = 0;
-
-  var sId = 0;
-  var eId = 0;
-
-  var msRunTime = sRunTime * 1000;
-
-  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-    logs = getLog(logPattern).results.log;
-
-    if(logs.length > 0) {
-      sId = logs[0].id;
-      eId = logs[logs.length - 1].id;
-    }
-
-    logs.forEach(function(val, idx) {
-      pTime = ISODate(val.t.$date);
-      if(pTime.getTime() > eTime.getTime()) {
-        print(val);
-      }
-    });
-
-    if (pTime > eTime) {
-      eTime = pTime;
-    }
-
-    if (sId == eId) {
-      int = 1000;
-    } else {
-      int = Math.min(msMaxWait,diffTime(eTime, sTime));
-    }
-
-//    process.stdout.write(spinChars[iSpin++ % 4]);
-    sleep(int);
-//    process.stdout.write("\b");
-    if (sRunTime !== undefined && sRunTime !== null) {
-      msRunTime -= int;
-    }
-    sTime = eTime;
-  }
-}
-
-function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
-  return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
-}
-
-function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
-  var logs = [];
-  var int = 1000;
-  var pTime = ISODate();
-  pTime.setTime(0);
-
-  var msRunTime = sRunTime * 1000;
-  var counts = [];
-
-  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-    var latestCounts = getEstimatedDocumentCounts(nsPattern).results;
-
-    latestCounts.forEach(function (item, idx) {
-      if (counts[idx] === undefined) {
-        counts[idx] = {};
-      }
-      counts[idx].ns = item.ns; 
-      counts[idx].last = counts[idx].count;
-      counts[idx].count = item.count; 
-      counts[idx].rate = counts[idx].count / counts[idx].last * 100;
-      if (!("start" in counts[idx])) {
-        counts[idx].start = item.count;
-      }
-      counts[idx].change = item.count - counts[idx].start;
-    });
-
-    print (counts);
-
-    sleep(msPollTime);
-    if (sRunTime !== undefined && sRunTime !== null) {
-      msRunTime -= msPollTime;
-    }
-  }
-}
