@@ -518,7 +518,7 @@ function tailLog(logPattern, sRunTime) {
     if (sRunTime !== undefined && sRunTime !== null) {
       msRunTime -= int;
     }
-    lastTime = pTime;
+    lastTime = printTime;
   }
 }
 
@@ -676,3 +676,18 @@ function addTime(startTime, seconds) {
   return retTime;
 }
 
+function getStableAPIStatus() {
+  var ret = { ok: 1, results: {} }
+  
+  var apiStatus = db.serverStatus().metrics.apiVersions;
+ 
+  Object.keys(apiStatus).forEach(function (app) {
+    apiStatus[app].forEach(function (ver) {
+      if (! (ver in ret.results)){
+        ret.results[ver] = [];
+      }
+      ret.results[ver].push(app);
+    });
+  });
+  return ret;
+}
