@@ -1,64 +1,7 @@
 
 var usage = {};
 
-
 function getHelp(pattern) {
-
-usage.setBalancing =
-`setBalancing(nsPattern, enable)
-  Description:
-    Enables/Disables balancing for namespaces based upon the nsPattern (regex).
-  Parameters:
-    nsPattern - regex/string to limit databases returned
-    enable - boolean - true/false
-  Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, results: <enable/disable-result> } ] }`;
-
-usage.setProfilingLevel =
-`setProfilingLevels(nsPattern)
-  Description:
-    Sets the profiling status for all namespaces based upon the nsPattern (regex).
-  Parameters:
-    nsPattern - regex/string to limit databases returned
-  Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
-
-usage.tailLog =
-`tailLog(logPattern, sRunTime)
-  Description:
-    Tails the internal log for sRunTime seconds looking for logPattern
-  Parameters:
-    logPattern - regex/string used to match the log entry
-    sRunTime - Seconds to run before exiting; omit to run continuously
-  Prints:
-    <log-entry>
-    ...`;
-
-usage.watchCounts =
-`watchCounts(nsPattern, sRunTime, msPollTime)
-  Description:
-    Calls watchEstimatedDocumentCounts()
-    Watches the count changes on collections matching the pattern.
-  Parameters:
-    nsPattern - regex/string used to select databases/collections to watch
-    sRunTime - Seconds to run before exiting; omit to run continuously
-    msPollTime - ms between polling for counts (default: 1000)
-  Prints:
-    <count>
-    ...`;
-
-usage.watchEstimatedDocumentCounts =
-`watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime)
-  Description:
-    Watches the count changes on collections matching the pattern.
-  Parameters:
-    nsPattern - regex/string used to select databases/collections to watch
-    sRunTime - Seconds to run before exiting; omit to run continuously
-    msPollTime - ms between polling for counts (default: 1000)
-  Prints:
-    <log-entry>\n
-    ...`;
-
   Object.keys(usage).sort().forEach(function (fnc) {
     if(fnc.match(pattern)) {
       print('-----');
@@ -431,6 +374,15 @@ function getProfilingStatuses(nsPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.setProfilingLevel =
+`setProfilingLevels(nsPattern)
+  Description:
+    Sets the profiling status for all namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases returned
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
+
 function setProfilingLevels(nsPattern, level, msThreshold) {
   var ret = { ok: 1, results: [] };
   if (level == null){
@@ -523,6 +475,16 @@ function getCreateIndexCommands(nsPattern, idxPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.setBalancing =
+`setBalancing(nsPattern, enable)
+  Description:
+    Enables/Disables balancing for namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases returned
+    enable - boolean - true/false
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, results: <enable/disable-result> } ] }`;
+
 function setBalancing(nsPattern, enable) {
   var ret = { ok: 1, results: [] };
   try {
@@ -544,6 +506,17 @@ function setBalancing(nsPattern, enable) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+usage.tailLog =
+`tailLog(logPattern, sRunTime)
+  Description:
+    Tails the internal log for sRunTime seconds looking for logPattern
+  Parameters:
+    logPattern - regex/string used to match the log entry
+    sRunTime - Seconds to run before exiting; omit to run continuously
+  Prints:
+    <log-entry>
+    ...`;
 
 function tailLog(logPattern, sRunTime) {
   var logs = [];
@@ -586,11 +559,36 @@ function tailLog(logPattern, sRunTime) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.watchCounts =
+`watchCounts(nsPattern, sRunTime, msPollTime)
+  Description:
+    Calls watchEstimatedDocumentCounts()
+    Watches the count changes on collections matching the pattern.
+  Parameters:
+    nsPattern - regex/string used to select databases/collections to watch
+    sRunTime - Seconds to run before exiting; omit to run continuously
+    msPollTime - ms between polling for counts (default: 1000)
+  Prints:
+    <count>
+    ...`;
+
 function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
   return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+usage.watchEstimatedDocumentCounts =
+`watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime)
+  Description:
+    Watches the count changes on collections matching the pattern.
+  Parameters:
+    nsPattern - regex/string used to select databases/collections to watch
+    sRunTime - Seconds to run before exiting; omit to run continuously
+    msPollTime - ms between polling for counts (default: 1000)
+  Prints:
+    <log-entry>\n
+    ...`;
 
 function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
   var logs = [];
