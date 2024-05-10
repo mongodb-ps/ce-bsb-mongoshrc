@@ -1,4 +1,9 @@
 
+print(`
+Type 'getHelp()' to list usage.
+Type 'getHelp(<regex>) to get specific usage for functions.
+`);
+
 var usage = {};
 
 function getHelp(pattern) {
@@ -569,7 +574,14 @@ usage.watchCounts =
     sRunTime - Seconds to run before exiting; omit to run continuously
     msPollTime - ms between polling for counts (default: 1000)
   Prints:
-    <count>
+    {
+      ns: <namespace>,
+      last: <integer>,
+      count: <integer>,
+      rate: <integer>,
+      start: <integer>,
+      change: <integer>
+    }
     ...`;
 
 function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
@@ -587,7 +599,14 @@ usage.watchEstimatedDocumentCounts =
     sRunTime - Seconds to run before exiting; omit to run continuously
     msPollTime - ms between polling for counts (default: 1000)
   Prints:
-    <log-entry>\n
+    {
+      ns: <namespace>,
+      last: <integer>,
+      count: <integer>,
+      rate: <integer>,
+      start: <integer>,
+      change: <integer>
+    }
     ...`;
 
 function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
