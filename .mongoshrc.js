@@ -1,171 +1,71 @@
 
+var usage = {};
+
+
 function getHelp(pattern) {
-  print(".mongoshrc Plug In Help:\n");
-  if('dbFind'.match(pattern)) {
-    print("  dbFind(nsPattern, query, proj, sort)");
-    print("    Description:");
-    print("      Runs a query across namespaces based upon the nsPattern (regex).");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit namespaces");
-    print("      query     - (optional) query to run against each namespace");
-    print("      proj      - (optional) projection of the results");
-    print("      sort      - (optional) sort the results for each query");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ { ns: <ns>, results: [<query-results>] ] }\n");
-  }
-  if('dropCollections'.match(pattern)) {
-    print('  dropCollections(nsPattern)');
-    print('    Description:');
-    print('      Drops multiple collections depending on the regex pattern matching the namespace.');
-    print('      Use getCollections() to confirm collections to be dropped.');
-    print('    Parameters:');
-    print('      nsPattern - regex/string to limit collections/namespaces dropped');
-    print('    Returns:');
-    print('      { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] }\n');
-  }
-  if('dropDatabases'.match(pattern)) {
-    print('  dropDatabases(pattern)');
-    print('    Description:');
-    print('      Drops multiple databases depending on the regex pattern matching database name.');
-    print('      Use getDatabases() to confirm databases to be dropped.');
-    print('    Parameters:');
-    print('      pattern - regex/string to limit databases dropped');
-    print('    Returns:');
-    print('      { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] }\n');
-    print('      \n');
-  }
-  if('dropIndexes'.match(pattern)) {
-    print('  dropIndexes(nsPattern, idxPattern)');
-    print('    Description:');
-    print('      Drops multiple indexes across namespaces matching the nsPattern (regex) and');
-    print('      matching the idxPattern such as name or option.');
-    print('      Use getIndexes() to confirm indexes to be dropped.');
-    print('    Parameters:');
-    print('      nsPattern - regex/string to limit namespaces');
-    print('      idxPattern - regex/string to indexes');
-    print('    Returns:');
-    print('      { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] }\n');
-  }
-  if('getCollection'.match(pattern)) {
-    print("  getCollection(namespace)");
-    print("    Description:");
-    print("      Gets a collection based upon the namespace.");
-    print("    Parameters:");
-    print("      namespace - <db>.<col>");
-    print("    Returns:");
-    print("      <collectionObject>\n");
-  }
-  if('getCollections'.match(pattern)) {
-    print('  getCollections(nsPattern)');
-    print('    Description:');
-    print('      Get collections based upon the namespace pattern (regex).');
-    print('    Parameters:');
-    print('      nsPattern - regex/string to limit databases/collections returned');
-    print('    Returns:');
-    print('      { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } }\n');
-  }
-  if('getCreateIndexCommands'.match(pattern)) {
-    print("  setProfilingLevels(nsPattern)");
-    print("    Description:");
-    print("      Sets the profiling status for all namespaces based upon the nsPattern (regex).");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit databases returned");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
-  }
-  if('getDatabases'.match(pattern)) {
-    print("  getDatabases(dbPattern)");
-    print("    Description:");
-    print("      Get databases based upon the dbPattern (regex).");
-    print("    Parameters:");
-    print("      dbPattern - regex/string to limit databases returned");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [<db>, ...] }\n");
-  }
-  if('getIndexes'.match(pattern)) {
-    print("  getIndexes(nsPattern, idxPattern)");
-    print("    Description:");
-    print("      Get indexes based upon the nsPattern (regex).");
-    print("      idxPattern allows you to scan the index for the name, parameters, etc.");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit namespaces");
-    print("      idxPattern - regex/string to limit indexes");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }\n");
-  }
-  if('getNameSpaces'.match(pattern)) {
-    print("  getNameSpaces(nsPattern)");
-    print("    Description:");
-    print("      Get namespaces based upon the nsPattern (regex).");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit databases returned");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ <ns>, ... ] }\n");
-  }
-  if('getProfilingStatus'.match(pattern)) {
-    print("  getProfilingStatuses(nsPattern)");
-    print("    Description:");
-    print("      Gets the profiling status for all namespaces based upon the nsPattern (regex).");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit databases");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
-  }
-  if('setBalancing'.match(pattern)) {
-    print("  setBalancing(nsPattern, enable)");
-    print("    Description:");
-    print("      Enables/Disables balancing for namespaces based upon the nsPattern (regex).");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit databases returned");
-    print("      enable - boolean - true/false");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ { db: <db>, results: <enable/disable-result> } ] }\n");
-  }
-  if('setProfilingLevel'.match(pattern)) {
-    print("  setProfilingLevels(nsPattern)");
-    print("    Description:");
-    print("      Sets the profiling status for all namespaces based upon the nsPattern (regex).");
-    print("    Parameters:");
-    print("      nsPattern - regex/string to limit databases returned");
-    print("    Returns:");
-    print("      { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }\n");
-  }
-  if('tailLog'.match(pattern)) {
-    print("  tailLog(logPattern, sRunTime)");
-    print("    Description:");
-    print("      Tails the internal log for sRunTime seconds looking for logPattern");
-    print("    Parameters:");
-    print("      logPattern - regex/string used to match the log entry");
-    print("      sRunTime - Seconds to run before exiting; omit to run continuously");
-    print("    Prints:");
-    print("      <log-entry>\n");
-    print("      ...\n");
-  }
-  if('watchCounts'.match(pattern)) {
-    print("  watchCounts(nsPattern, sRunTime, msPollTime)");
-    print("    Description:");
-    print("      Calls watchEstimatedDocumentCounts()");
-    print("      Watches the count changes on collections matching the pattern.");
-    print("    Parameters:");
-    print("      nsPattern - regex/string used to select databases/collections to watch");
-    print("      sRunTime - Seconds to run before exiting; omit to run continuously");
-    print("      msPollTime - ms between polling for counts (default: 1000)");
-    print("    Prints:");
-    print("      <log-entry>\n");
-    print("      ...\n");
-  }
-  if('watchEstimatedDocumentCounts'.match(pattern)) {
-    print("  watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime)");
-    print("    Description:");
-    print("      Watches the count changes on collections matching the pattern.");
-    print("    Parameters:");
-    print("      nsPattern - regex/string used to select databases/collections to watch");
-    print("      sRunTime - Seconds to run before exiting; omit to run continuously");
-    print("      msPollTime - ms between polling for counts (default: 1000)");
-    print("    Prints:");
-    print("      <log-entry>\n");
-    print("      ...\n");
-  }
+
+usage.setBalancing =
+`setBalancing(nsPattern, enable)
+  Description:
+    Enables/Disables balancing for namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases returned
+    enable - boolean - true/false
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, results: <enable/disable-result> } ] }`;
+
+usage.setProfilingLevel =
+`setProfilingLevels(nsPattern)
+  Description:
+    Sets the profiling status for all namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases returned
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
+
+usage.tailLog =
+`tailLog(logPattern, sRunTime)
+  Description:
+    Tails the internal log for sRunTime seconds looking for logPattern
+  Parameters:
+    logPattern - regex/string used to match the log entry
+    sRunTime - Seconds to run before exiting; omit to run continuously
+  Prints:
+    <log-entry>
+    ...`;
+
+usage.watchCounts =
+`watchCounts(nsPattern, sRunTime, msPollTime)
+  Description:
+    Calls watchEstimatedDocumentCounts()
+    Watches the count changes on collections matching the pattern.
+  Parameters:
+    nsPattern - regex/string used to select databases/collections to watch
+    sRunTime - Seconds to run before exiting; omit to run continuously
+    msPollTime - ms between polling for counts (default: 1000)
+  Prints:
+    <count>
+    ...`;
+
+usage.watchEstimatedDocumentCounts =
+`watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime)
+  Description:
+    Watches the count changes on collections matching the pattern.
+  Parameters:
+    nsPattern - regex/string used to select databases/collections to watch
+    sRunTime - Seconds to run before exiting; omit to run continuously
+    msPollTime - ms between polling for counts (default: 1000)
+  Prints:
+    <log-entry>\n
+    ...`;
+
+  Object.keys(usage).sort().forEach(function (fnc) {
+    if(fnc.match(pattern)) {
+      print('-----');
+      print(usage[fnc]);
+    }
+  });
+  print('-----');
 }
 
 // Utilities
@@ -179,6 +79,17 @@ function dbAdminCommand(optDocument)
   return getDatabase('admin').adminCommand(optDocument);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCollectionUsage =
+`getCollection(namespace)
+  Description:
+    Gets a collection object based upon the namespace.
+  Parameters:
+    namespace - <db>.<col>
+  Returns:
+    <collection-object>`;
+
 function getCollection(namespace) {
   var ns = splitNameSpace(namespace)
   if (ns.db !== null && ns.col !== null) {
@@ -187,12 +98,38 @@ function getCollection(namespace) {
   return collection;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.setDatabaseUsage =
+`getDatabase(database)
+  Description:
+    Gets a database object based upon the namespace.
+  Parameters:
+    database - <db>
+  Returns:
+    <database-object>`;
+
 function getDatabase(database) {
   return db.getSiblingDB(database);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 
 // Get/Drop commands
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.dropCollections =
+`dropCollections(nsPattern)
+  Description:
+    Drops multiple collections depending on the regex pattern matching the namespace.
+    Use getCollections() to confirm collections to be dropped.
+  Parameters:
+    nsPattern - regex/string to limit collections/namespaces dropped
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] }
+  WARNING: THIS DOES NOT PROMPT FOR CONFIRMATION.`;
 
 function dropCollections(nsPattern) {
   var ret = { ok: 1, results: [] }
@@ -214,6 +151,19 @@ function dropCollections(nsPattern) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.dropDatabases =
+`dropDatabases(pattern)
+  Description:
+    Drops multiple databases depending on the regex pattern matching database name.
+    Use getDatabases() to confirm databases to be dropped.
+  Parameters:
+    pattern - regex/string to limit databases dropped
+  Returns:
+    { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] }
+  WARNING: THIS DOES NOT PROMPT FOR CONFIRMATION.`;
+
 function dropDatabases(pattern) {
   var ret = { ok: 1, results: [] };
   try {
@@ -226,6 +176,21 @@ function dropDatabases(pattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.dropIndexes = 
+`dropIndexes(nsPattern, idxPattern)
+   Description:
+     Drops multiple indexes across namespaces matching the nsPattern (regex) and
+     matching the idxPattern such as name or option.
+     Use getIndexes() to confirm indexes to be dropped.
+   Parameters:
+     nsPattern - regex/string to limit namespaces
+     idxPattern - regex/string to indexes
+   Returns:
+     { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] }
+   WARNING: THIS DOES NOT PROMPT FOR CONFIRMATION.`;
 
 function dropIndexes(nsPattern, idxPattern) {
   ret = { ok: 1 }
@@ -246,6 +211,17 @@ function dropIndexes(nsPattern, idxPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCollections =
+`getCollections(nsPattern)
+  Description:
+    Get collections based upon the namespace pattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases/collections returned
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } }`;
 
 function getCollections(nsPattern) {
   var ret = { ok: 1 }
@@ -270,6 +246,8 @@ function getCollections(nsPattern) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 function getEstimatedDocumentCounts(nsPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -283,6 +261,17 @@ function getEstimatedDocumentCounts(nsPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getDatabasesUsage =
+`getDatabases(dbPattern)
+  Description:
+    Get databases based upon the dbPattern (regex).
+  Parameters:
+    dbPattern - regex/string to limit databases returned
+  Returns:
+    { ok: ..., err: <error>, results: [<db>, ...] }`;
 
 function getDatabases(dbPattern) {
   var ret = { ok: 1 }
@@ -299,6 +288,19 @@ function getDatabases(dbPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getIndexes =
+`getIndexes(nsPattern, idxPattern)
+  Description:
+    Get indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, parameters, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 function getIndexes(nsPattern, idxPattern) {
   var ret = { ok: 1 }
@@ -322,6 +324,8 @@ function getIndexes(nsPattern, idxPattern) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 function getIndexStats(nsPattern, idxPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -343,6 +347,8 @@ function getIndexStats(nsPattern, idxPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 function getUnusedIndexes(nsPattern) {
   var ret = { ok: 1 }
@@ -366,6 +372,17 @@ function getUnusedIndexes(nsPattern) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getNameSpaces = 
+`getNameSpaces(nsPattern)
+  Description:
+    Get namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases returned
+  Returns:
+    { ok: ..., err: <error>, results: [ <ns>, ... ] }`;
+
 function getNameSpaces(nsPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -385,6 +402,17 @@ function getNameSpaces(nsPattern) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getProfilingStatus =
+`getProfilingStatuses(nsPattern)
+  Description:
+    Gets the profiling status for all namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit databases
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
+
 function getProfilingStatuses(nsPattern) {
   var ret = { ok: 1 };
   ret.results = [];
@@ -400,6 +428,8 @@ function getProfilingStatuses(nsPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 function setProfilingLevels(nsPattern, level, msThreshold) {
   var ret = { ok: 1, results: [] };
@@ -422,6 +452,20 @@ function setProfilingLevels(nsPattern, level, msThreshold) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.dbFind =
+`dbFind(nsPattern, query, proj, sort)
+  Description:
+    Runs a query across namespaces based upon the nsPattern (regex).
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    query     - (optional) query to run against each namespace
+    proj      - (optional) projection of the results
+    sort      - (optional) sort the results for each query
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <ns>, results: [<query-results>] ] }`;
+
 function dbFind(nsPattern, query = {}, proj = {}, sort = {}) {
   var ret = { ok: 1, results: [] };
   try {
@@ -435,11 +479,25 @@ function dbFind(nsPattern, query = {}, proj = {}, sort = {}) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 function splitNameSpace(namespace) {
   var database = namespace.substr(0,namespace.match(/\./).index);
   var collection = namespace.substr(namespace.match(/\./).index+1);
   return { db: database, col: collection }
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCreateIndexCommands =
+`getCreateIndexCommands(nsPattern, idxPattern)
+  Description:
+    Gets the index creation commands based upon the namespace pattern and index pattern.
+  Parameters:
+    nsPattern - regex/string to limit to specific namespaces
+    idxPattern - regex/string to limit to specific indexes or types of indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <namespace>, commands: [ <create-index-command>, ...]  } ], string: <create-index-commands> }`;
 
 function getCreateIndexCommands(nsPattern, idxPattern) {
   var ret = { ok: 1, results: [], string: '' };
@@ -463,6 +521,8 @@ function getCreateIndexCommands(nsPattern, idxPattern) {
   return ret;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 function setBalancing(nsPattern, enable) {
   var ret = { ok: 1, results: [] };
   try {
@@ -482,6 +542,8 @@ function setBalancing(nsPattern, enable) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 function tailLog(logPattern, sRunTime) {
   var logs = [];
@@ -522,9 +584,13 @@ function tailLog(logPattern, sRunTime) {
   }
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
   return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
   var logs = [];
@@ -562,6 +628,8 @@ function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
     }
   }
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 // Keyhole
 
