@@ -523,12 +523,14 @@ usage.tailLog =
     <log-entry>
     ...`;
 
-function tailLog(logPattern, sRunTime) {
+function tailLog(logPattern, options = {}) {
+  var sRunTime = options.sRunTime;
+  var showRate = options.showRate;
   var logs = [];
-  var lastTime = ISODate();
-  lastTime.setTime(0);
-  var printTime = ISODate();
-  printTime.setTime(0);
+  var rateCounter = 0;
+  var startTime = 0;
+  var lastTime = 0;
+  var printTime = 0;
 
   var int = 1000;
 
@@ -540,13 +542,19 @@ function tailLog(logPattern, sRunTime) {
 
     dups = 0;
     logs.forEach(function(val, idx) {
-      printTime = ISODate(val.t.$date);
-      if(printTime.getTime() > lastTime.getTime()) {
+      printTime = ISODate(val.t.$date).getTime();
+      if(printTime > lastTime) {
+        if(startTime == 0) { startTime = printTime }
+        rateCounter += 1;
         print(val);
       } else {
         dups++;
       }
     });
+
+    if(showRate) {
+      print ("Rate: " + (rateCounter / ((printTime - startTime)/1000)).toFixed(3) + "/s"); 
+    }
 
     if(logs.length < 1024) {
       int = 1000;
