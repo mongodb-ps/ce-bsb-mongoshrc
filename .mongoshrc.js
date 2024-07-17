@@ -1,4 +1,8 @@
 
+// Add changing collation of a collection (and copying all of the data and whatnot)
+
+const fs = require('node:fs')
+
 print(`
 Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
@@ -230,6 +234,20 @@ function getDatabases(dbPattern) {
         ret.results.push(database);
       }
     });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+function listDatabases(dbPattern) {
+  var ret = { ok: 1 }
+  ret.results = [];
+  try {
+    ret.results = dbRunCommand({listDatabases: 1});
+    ret.results.databases = ret.results.databases.splice(3); // This is making an assumption that admin, local, and config are the first 3 DBs
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -656,7 +674,90 @@ function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+function getHosts(pattern) {
+  var ret = { ok: 1, results: [] };
+  try {
+    rs.conf().members.forEach(function (member) {
+      if(member.host.match(pattern)) {
+        ret.results.push(member.host);
+      }
+    });
+    
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+function getHostsInfo (pattern) {
+  var ret = { ok: 1, results: [] };
+  try {
+    getHosts(pattern).results.forEach(function (host) {
+      print ('host: ' + host);
+      print ('URI: ' + 'mongodb://bsbishop:wpxy699M!@' + host + '/?tls=true');
+      ret.results.push(connect('mongodb://bsbishop:wpxy699M!@' + host + '/?tls=true').getDB('admin').adminCommand({ hostInfo: 1}));
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 // Keyhole
+
+function getAllInfo() {
+  var ret = { ok: 1, results: [] };
+
+  var out = ret.results;
+  var cluster = {};
+
+  try {
+
+    // Build Info
+    {
+      var buildInfo = getBuildInfo().results;
+      cluster.buildInfo = {};
+      cluster.buildInfo.gitVersion = buildInfo.gitVersion;
+      cluster.buildInfo.modules = buildInfo.modules;
+      cluster.buildInfo.version = buildInfo.version;
+    }
+
+    // getCmdLineOpts
+    {
+      cluster.getCmdLineOpts = getCmdLineOpts();
+    }
+
+    // getCmdLineOpts
+    {
+      cluster.cluster = getClusterType().results;
+    }
+   
+    // databases
+    {
+      cluster.databases = listDatabases().results.databases;
+      cluster.databases.forEach(function (dbObj) {
+        dbObj.stats = getDatabaseStats(dbObj.name).results; 
+        ['db', 'collections', 'views', 'totalSize', 'fsUsedSize', 'fsTotalSize', 'ok', '$clusterTime','operationTime'].forEach(function (key) {
+          delete dbObj.stats[key];
+        });
+      });
+      
+    }
+   
+    out.push(cluster);
+    
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
 
 function getBuildInfo() {
   var ret = { ok: 1 };
@@ -669,11 +770,22 @@ function getBuildInfo() {
   return ret; 
 }
 
-// FIXIT
-function getCollStats(nsPattern) {
+function getDatabaseStats(database) {
   var ret = { ok: 1 };
   try {
-//    ret.results = getDatabase('admin').runCommand({ buildInfo: 1});
+    ret.results = getDatabase(database).stats();
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+// FIXIT
+function getCollectionStats(namespace) {
+  var ret = { ok: 1 };
+  try {
+    ret.results = getCollection(namespace).stats();
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -682,10 +794,27 @@ function getCollStats(nsPattern) {
 }
 
 // FIXIT: Catch sharded cluster!
+// THIS IS WRONG
 function getConnPoolStats() {
   var ret = { ok: 1, results: [] };
   try {
-    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
+    ret.results = dbAdminCommand({ getCmdLineOpts: 1 });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+function getClusterType() {
+  var ret = { ok: 1 };
+  try {
+    var serverStatus = getServerStatus().results;
+    if (serverStatus.repl && serverStatus.repl.setName != "") {
+      ret.results = "replica";
+    } else if (serverStatus.sharding && serverStatus.sharding.ConfigsvrConnectionString != "") {
+      ret.results = "sharded";
+    }
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -696,7 +825,18 @@ function getConnPoolStats() {
 function getHostInfo () {
   var ret = { ok: 1 };
   try {
-    ret.results = getDatabase('admin').adminCommand({ hostInfo: 1});
+    ret.results = dbAdminCommand({ hostInfo: 1});
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+function getServerStatus () {
+  var ret = { ok: 1 };
+  try {
+    ret.results = dbRunCommand({serverStatus: 1});
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -745,7 +885,6 @@ function getCmdLineOpts () {
     ret.err = error;
   }
   return ret; 
-
 }
 
 function getBuildInfo() {
