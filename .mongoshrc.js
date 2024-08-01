@@ -27,6 +27,39 @@ function dbAdminCommand(optDocument)
   return getDatabase('admin').adminCommand(optDocument);
 }
 
+const admin = getDatabase('admin');
+const config = getDatabase('config');
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.listSessionsUsage =
+`listSessions(namespace)
+  Description:
+    Gets a collection object based upon the namespace.
+  Parameters:
+    namespace - <db>.<col>
+  Returns:
+    <collection-object>`;
+
+function listSessions(regex, options = { allUsers: true } ) {
+  var ret = { ok: 1, results: [] }
+  
+  try {
+    config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
+      if(JSON.stringify(session).match(regex)){
+        print("SESSION:" + session);
+        ret.results.push(session);
+      }
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.getCollectionUsage =
@@ -570,6 +603,189 @@ function tailLog(logPattern, options = {}) {
   }
 }
 
+function queryShape(query) {
+  var shape;
+  if(typeof(query) == 'object'
+    && query.constructor.name == 'Array') {
+    shape = [];
+    query.forEach((el) => {
+      shape.push(queryShape(el));
+    });
+  } else {
+    shape = {};
+    Object.keys(query).sort().forEach(function (key) {
+      shape[key] = typeof(query[key]);
+      if(shape[key] == 'object') {
+        shape[key] = query[key].constructor.name;
+        if(shape[key] == 'Object') {
+          shape[key] = queryShape(query[key]);
+        }
+      }
+    });
+  }
+  return shape;
+}
+
+function slowQueries(logPattern, options = {}) {
+  var sRunTime = options.sRunTime;
+  var showRate = options.showRate;
+  var logs = [];
+  var rateCounter = 0;
+  var startTime = 0;
+  var lastTime = 0;
+  var printTime = 0;
+
+  var int = 1000;
+
+  var msRunTime = sRunTime * 1000;
+  var dups = 0;
+
+  var idxSlowQueries = {};
+  var slowQueries = [];
+
+  var slowQuery = {};
+  var colWidth = {
+    totalTime: 'tTotal'.length,
+    avgTime: 'tAvg'.length,
+    maxTime: 'tMax'.length,
+    minTime: 'tMin'.length,
+    count: 'Count'.length,
+    ns: 'ns'.length,
+    op: 'op'.length,
+    plan: 'Plan'.length,
+    shape: 'Query Shape'.length
+  };
+
+  var op = '';
+  var strShape = '';
+  var idx = '';
+  var db = '';
+  var ns = '';
+  var plan = '';
+  var query = '';
+  var queryPlan = {};
+
+
+  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
+    logs = getLog(logPattern).results.log;
+    dups = 0;
+    logs.forEach(function(val, idx) {
+      printTime = ISODate(val.t.$date).getTime();
+      if(printTime > lastTime) {
+        if(startTime == 0) { startTime = printTime }
+        rateCounter += 1;
+        if(val.msg == 'Slow query' && !val.attr.ns.match(/^(admin|local|config)\./) && !Object.keys(val.attr.command).includes('hello')) { 
+          db = splitNameSpace(val.attr.ns).db;
+          op = (val.attr.command.find && 'find')
+            || (val.attr.command.aggregate && 'aggregate')
+            || (val.attr.command.delete && 'delete')
+            || (val.attr.command.insert && 'insert')
+            || (val.attr.command.update && 'update');
+          ns = db + '.' + val.attr.command[op];
+          query = (op == 'find' && val.attr.command.filter )
+            || (op == 'insert' && val.attr.command.documents[0])
+            || (op == 'aggregate' && val.attr.command.pipeline)
+            || (op == 'update' && val.attr.command.updates[0].q)
+            || (op == 'delete' && val.attr.command.deletes[0].q);
+
+          strShape = JSON.stringify(queryShape(query));
+          idx = op + ':' + strShape;
+
+          plan = val.attr.planSummary || 'unknown';
+          if (0 && !plan){
+print('ns: ' + ns);
+print("query: " + JSON.stringify(query));
+print('NO PLAN')
+            if(op != 'aggregate') {
+print('GET PLAN')
+              queryPlan = getCollection(ns).find(query).explain('queryPlanner');
+print(queryPlan);
+              plan = (queryPlan.queryPlanner.winningPlan.stage == 'COLLSCAN' && 'COLLSCAN')
+print('GOT PLAN')
+                || (queryPlan.queryPlanner.winningPlan.stage == 'FETCH' && 'IXSCAN ' + queryPlan.queryPlanner.winningPlan.inputStage.keyPattern);
+            }
+          } 
+
+          if(op) {
+            if(Object.keys(idxSlowQueries).includes(idx)){
+              slowQuery = slowQueries[idxSlowQueries[idx]];
+              slowQuery.count++;
+              slowQuery.maxTime = Math.max(slowQuery.maxTime, val.attr.durationMillis);
+              slowQuery.minTime = Math.min(slowQuery.minTime, val.attr.durationMillis);
+              slowQuery.avgTime = slowQuery.totalTime / slowQuery.count;
+              slowQuery.totalTime += val.attr.durationMillis;
+            } else {
+              slowQuery = {};
+              slowQuery.shape = strShape;
+              slowQuery.op = op;
+              slowQuery.ns = ns;
+              slowQuery.count = 1;
+              slowQuery.maxTime = val.attr.durationMillis;
+              slowQuery.minTime = val.attr.durationMillis;
+              slowQuery.totalTime = val.attr.durationMillis;
+              slowQuery.avgTime = slowQuery.totalTime / slowQuery.count;
+              slowQuery.plan = plan;
+              idxSlowQueries[idx] = slowQueries.push(slowQuery) - 1;
+              colWidth.plan = Math.max(colWidth.plan, slowQuery.plan.length);
+              colWidth.shape = Math.max(colWidth.shape, slowQuery.shape.length);
+              colWidth.op = Math.max(colWidth.op, op.length);
+              colWidth.ns = Math.max(colWidth.ns, ns.length);
+            }
+            colWidth.totalTime = Math.max(colWidth.totalTime, slowQuery.totalTime.toString().length);
+            colWidth.avgTime = Math.max(colWidth.avgTime, slowQuery.avgTime.toString().length);
+            colWidth.maxTime = Math.max(colWidth.maxTime, slowQuery.maxTime.toString().length);
+            colWidth.minTime = Math.max(colWidth.minTime, slowQuery.minTime.toString().length);
+            colWidth.count = Math.max(colWidth.count, slowQuery.count.toString().length);
+          }
+        }
+      } else {
+        dups++;
+      }
+    });
+
+    slowQueries.sort((a,b) => b.totalTime - a.totalTime);
+    slowQueries.forEach((q,i) => {
+      idxSlowQueries[q.op + ':' + q.shape] = i;
+    });
+
+    print('tTotal'.padStart(colWidth.totalTime) +
+        ' | ' + 'tAvg'.padStart(colWidth.avgTime) +
+        ' | ' + 'tMax'.padStart(colWidth.maxTime) +
+        ' | ' + 'tMin'.padStart(colWidth.minTime) +
+        ' | ' + 'Count'.padStart(colWidth.count) +
+        ' | ' + 'ns'.padStart(colWidth.ns) +
+        ' | ' + 'op'.padStart(colWidth.op) +
+        ' | ' + 'Plan'.padEnd(colWidth.plan) +
+        ' | Query Shape');
+    print("-".padStart(Object.values(colWidth).reduce((pSum, a) => pSum+a, 0) + (Object.keys(colWidth).length * 3),'-'));
+    slowQueries.forEach((sq) => {
+      print(sq.totalTime.toString().padStart(colWidth.totalTime) +
+        ' | ' + sq.avgTime.toString().padStart(colWidth.avgTime) +
+        ' | ' + sq.maxTime.toString().padStart(colWidth.maxTime) +
+        ' | ' + sq.minTime.toString().padStart(colWidth.minTime) +
+        ' | ' + sq.count.toString().padStart(colWidth.count) +
+        ' | ' + sq.ns.padEnd(colWidth.ns) +
+        ' | ' + sq.op.padEnd(colWidth.op) +
+        ' | ' + sq.plan.padEnd(colWidth.plan) +
+        ' | ' + sq.shape);
+    });
+    print("\n\n\n");
+
+    if(logs.length < 1024) {
+      int = 1000;
+    } else {
+      int = dups;
+    }
+
+    sleep(int);
+    if (sRunTime !== undefined && sRunTime !== null) {
+      msRunTime -= int;
+    }
+    lastTime = printTime;
+  }
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.watchCounts =
@@ -704,10 +920,10 @@ function getHostInfo () {
   return ret; 
 }
 
-function getLog (logPattern, type = 'global') {
+function getLog (logPattern, options = { type: 'global' } ) {
   var ret = { ok: 1 };
   try {
-    var log = getDatabase('admin').adminCommand({ getLog: type });
+    var log = getDatabase('admin').adminCommand({ getLog: options.type });
     if("log" in log) {
       var logs = log.log;
       log.log = [];
