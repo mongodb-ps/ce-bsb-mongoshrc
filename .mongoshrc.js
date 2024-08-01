@@ -871,6 +871,40 @@ function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// FIXIT
+usage.changeStream =
+`changeStream(ns, pipeline, options, eventHandler)
+  Description:
+    Executes a change steam and, by default, just prints out change events.
+    Pipelines and options can be added along with passing in a function to handle the event.
+  Parameters:
+    ns - namespace
+    pipeline - (optional) A pipeline which will be  passed into watch(); Default: []
+    options - (optional) Options passed into watch(); Default: {}
+    eventHandler - A function which will be pass the event; Default: function which prints the event`;
+
+function changeStream(ns, pipeline = [], options = {}, eventHandler = function(event){print(JSON.stringify(event,null,2)); }) {
+  var ret = { ok: 1, results: [] };
+  try {
+    const collection = getCollection(ns);
+    var cursor = collection.watch(pipeline, options);
+
+    while(!cursor.isClosed()){
+      let next = cursor.tryNext();
+      while(next !== null) {
+        eventHandler(next);
+        //printjson(next);
+        next = cursor.tryNext();
+      }
+    }
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 // Keyhole
 
