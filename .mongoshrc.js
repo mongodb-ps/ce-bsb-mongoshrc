@@ -36,20 +36,85 @@ const config = getDatabase('config');
 usage.listSessionsUsage =
 `listSessions(namespace)
   Description:
-    Gets a collection object based upon the namespace.
+    Returns a list of all sessions minus mms-automation and mms-monitoring.
   Parameters:
     namespace - <db>.<col>
+    options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
     <collection-object>`;
 
 function listSessions(regex, options = { allUsers: true } ) {
-  var ret = { ok: 1, results: [] }
-  
+  var ret = { ok: 1, results: [] };
+
+  var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
+ 
   try {
     config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
-      if(JSON.stringify(session).match(regex)){
-        print("SESSION:" + session);
+      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(regex)){
         ret.results.push(session);
+      }
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.listSessionsBySessionIdUsage =
+`listSessions(namespace)
+  Description:
+    Returns a list of all sessions minus mms-automation and mms-monitoring.
+  Parameters:
+    namespace - <db>.<col>
+    options - (optional) Options to pass to $listSession. Default: { allUsers: true }
+  Returns:
+    <collection-object>`;
+
+function listSessionsBySessionId(regex, options = { allUsers: true } ) {
+  var ret = { ok: 1, results: {} };
+
+  var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
+ 
+  try {
+    config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
+      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(regex)){
+        ret.results[session._id.id] = session;
+      }
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+usage.listSessionsByUserIdUsage =
+`listSessions(namespace)
+  Description:
+    Returns a list of all sessions minus mms-automation and mms-monitoring.
+  Parameters:
+    namespace - <db>.<col>
+    options - (optional) Options to pass to $listSession. Default: { allUsers: true }
+  Returns:
+    <collection-object>`;
+
+function listSessionsByUserId(regex, options = { allUsers: true } ) {
+  var ret = { ok: 1, results: {} };
+
+  var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
+ 
+  try {
+    config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
+      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(regex)){
+        if(!ret.results[session.user.name]) {
+          ret.results[session.user.name] = [];
+        }
+        ret.results[session.user.name].push(session);
       }
     });
   } catch (error) {
@@ -572,7 +637,6 @@ function tailLog(logPattern, options = {}) {
 
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
     logs = getLog(logPattern).results.log;
-
     dups = 0;
     logs.forEach(function(val, idx) {
       printTime = ISODate(val.t.$date).getTime();
@@ -957,13 +1021,22 @@ function getHostInfo () {
 function getLog (logPattern, options = { type: 'global' } ) {
   var ret = { ok: 1 };
   try {
+    var sessions = listSessionsBySessionId().results;
     var log = getDatabase('admin').adminCommand({ getLog: options.type });
     if("log" in log) {
       var logs = log.log;
       log.log = [];
+      var item = {};
       logs.forEach(function (entry) {
-        if (entry.match(logPattern)) {
-          log.log.push(JSON.parse(entry));
+        item = JSON.parse(entry);
+        if(item.attr && item.attr.command && item.attr.command.lsid && item.attr.command.lsid.id && item.attr.command.lsid.id['$uuid']) {
+          if(sessions[item.attr.command.lsid.id['$uuid']]) {
+            // If we can match the session ID to the user then add the user in
+            item.attr.user = sessions[item.attr.command.lsid.id['$uuid']].user;
+          }
+        }
+        if (JSON.stringify(item).match(logPattern)) {
+          log.log.push(item);
         }
       });
     }
