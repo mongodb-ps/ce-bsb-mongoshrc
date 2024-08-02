@@ -727,7 +727,7 @@ function slowQueries(logPattern, options = {}) {
   var ns = '';
   var plan = '';
   var query = '';
-  var queryPlan = {};
+  var qPlan = {};
 
 
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
@@ -739,10 +739,16 @@ function slowQueries(logPattern, options = {}) {
         if(startTime == 0) { startTime = printTime }
         rateCounter += 1;
         if(val.msg == 'Slow query' && !val.attr.ns.match(/^(admin|local|config)\./) && !Object.keys(val.attr.command).includes('hello')) { 
-          db = splitNameSpace(val.attr.ns).db;
+          if(val.attr.ns.match(/\./)){
+            db = splitNameSpace(val.attr.ns).db;
+          } else {
+            db = ns;
+          }
+
           op = (val.attr.command.find && 'find')
             || (val.attr.command.aggregate && 'aggregate')
             || (val.attr.command.delete && 'delete')
+            || (val.attr.command.delete && 'remove')
             || (val.attr.command.insert && 'insert')
             || (val.attr.command.update && 'update');
           ns = db + '.' + val.attr.command[op];
@@ -750,27 +756,32 @@ function slowQueries(logPattern, options = {}) {
             || (op == 'insert' && val.attr.command.documents[0])
             || (op == 'aggregate' && val.attr.command.pipeline)
             || (op == 'update' && val.attr.command.updates[0].q)
-            || (op == 'delete' && val.attr.command.deletes[0].q);
+            || (op == 'delete' && val.attr.command.deletes[0].q)
+            || (op == 'remove' && val.attr.command.q);
 
           strShape = JSON.stringify(queryShape(query));
           idx = op + ':' + strShape;
 
-          plan = val.attr.planSummary || 'unknown';
-          if (0 && !plan){
-print('ns: ' + ns);
-print("query: " + JSON.stringify(query));
-print('NO PLAN')
-            if(op != 'aggregate') {
-print('GET PLAN')
-              queryPlan = getCollection(ns).find(query).explain('queryPlanner');
-print(queryPlan);
-              plan = (queryPlan.queryPlanner.winningPlan.stage == 'COLLSCAN' && 'COLLSCAN')
-print('GOT PLAN')
-                || (queryPlan.queryPlanner.winningPlan.stage == 'FETCH' && 'IXSCAN ' + queryPlan.queryPlanner.winningPlan.inputStage.keyPattern);
-            }
-          } 
-
           if(op) {
+            plan = val.attr.planSummary;
+
+            if(!plan) {
+              if(op == 'insert') {
+                plan = '';
+              } else {
+                if (op == 'aggregate' && !Object.keys(query[0]).includes('$match')) {
+                  plan = 'COLLSCAN';
+                } else {
+                  query = (op == 'aggregate' && Object.keys(query[0]).includes('$match' && query[0]['$match'])) || query;
+                  var qPlan = getCollection(ns).find(query).explain('queryPlanner');
+                  plan = (qPlan.queryPlanner.winningPlan.inputStage && qPlan.queryPlanner.winningPlan.inputStage.stage || qPlan.queryPlanner.winningPlan.stage);
+                  if(plan != 'COLLSCAN') {
+                    plan = plan + ' ' + JSON.stringify((qPlan.queryPlanner.winningPlan.inputStage && qPlan.queryPlanner.winningPlan.inputStage.keyPattern || qPlan.queryPlanner.winningPlan.filter));
+                  }
+                }
+              }
+            }
+
             if(Object.keys(idxSlowQueries).includes(idx)){
               slowQuery = slowQueries[idxSlowQueries[idx]];
               slowQuery.count++;
@@ -788,19 +799,20 @@ print('GOT PLAN')
               slowQuery.minTime = val.attr.durationMillis;
               slowQuery.totalTime = val.attr.durationMillis;
               slowQuery.avgTime = slowQuery.totalTime / slowQuery.count;
-              slowQuery.plan = plan;
               idxSlowQueries[idx] = slowQueries.push(slowQuery) - 1;
-              colWidth.plan = Math.max(colWidth.plan, slowQuery.plan.length);
               colWidth.shape = Math.max(colWidth.shape, slowQuery.shape.length);
               colWidth.op = Math.max(colWidth.op, op.length);
               colWidth.ns = Math.max(colWidth.ns, ns.length);
             }
+            slowQuery.plan = plan;
             colWidth.totalTime = Math.max(colWidth.totalTime, slowQuery.totalTime.toString().length);
             colWidth.avgTime = Math.max(colWidth.avgTime, slowQuery.avgTime.toString().length);
             colWidth.maxTime = Math.max(colWidth.maxTime, slowQuery.maxTime.toString().length);
             colWidth.minTime = Math.max(colWidth.minTime, slowQuery.minTime.toString().length);
             colWidth.count = Math.max(colWidth.count, slowQuery.count.toString().length);
+            colWidth.plan = Math.max(colWidth.plan, slowQuery.plan.length);
           }
+
         }
       } else {
         dups++;
@@ -822,6 +834,7 @@ print('GOT PLAN')
         ' | ' + 'Plan'.padEnd(colWidth.plan) +
         ' | Query Shape');
     print("-".padStart(Object.values(colWidth).reduce((pSum, a) => pSum+a, 0) + (Object.keys(colWidth).length * 3),'-'));
+
     slowQueries.forEach((sq) => {
       print(sq.totalTime.toString().padStart(colWidth.totalTime) +
         ' | ' + sq.avgTime.toString().padStart(colWidth.avgTime) +
@@ -833,6 +846,7 @@ print('GOT PLAN')
         ' | ' + sq.plan.padEnd(colWidth.plan) +
         ' | ' + sq.shape);
     });
+
     print("\n\n\n");
 
     if(logs.length < 1024) {
