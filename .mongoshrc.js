@@ -667,6 +667,36 @@ function tailLog(logPattern, options = {}) {
   }
 }
 
+function getObjectPaths(obj) {
+  var paths = [];
+  if(typeof(obj) == 'object'
+    && obj.constructor.name == 'Array') {
+    obj.forEach((el) => {
+      if (typeof(el) == 'object') {
+        getObjectPaths(el).forEach(function (path) {
+          paths.push(path); 
+        }); 
+      }
+    });
+  } else {
+    Object.keys(obj).sort().forEach(function (key) {
+      if(!key.match(/^\$/)) {
+        paths.push(key);
+      }
+      if (typeof(obj[key]) == 'object') {
+        getObjectPaths(obj[key]).forEach(function (path) {
+          if(!key.match(/^\$/)) {
+            paths.push(key + '.' + path); 
+          } else {
+            paths.push(path); 
+          }
+        }); 
+      }
+    });
+  }
+  return paths;
+}
+
 function queryShape(query) {
   var shape;
   if(typeof(query) == 'object'
@@ -717,6 +747,7 @@ function slowQueries(logPattern, options = {}) {
     ns: 'ns'.length,
     op: 'op'.length,
     plan: 'Plan'.length,
+    writes: 'Writes'.length,
     shape: 'Query Shape'.length
   };
 
@@ -727,6 +758,7 @@ function slowQueries(logPattern, options = {}) {
   var ns = '';
   var plan = '';
   var query = '';
+  var writes = [];
   var qPlan = {};
 
 
@@ -768,6 +800,8 @@ function slowQueries(logPattern, options = {}) {
             if(!plan) {
               if(op == 'insert') {
                 plan = '';
+
+                getIndexes(ns).results.indexes.forEach( (index) => writes.push(index.name)); 
               } else {
                 if (op == 'aggregate' && !Object.keys(query[0]).includes('$match')) {
                   plan = 'COLLSCAN';
@@ -781,6 +815,10 @@ function slowQueries(logPattern, options = {}) {
                 }
               }
             }
+if(op == 'update') {
+  var updates = val.attr.command.updates;
+  print('updates: ' + JSON.stringify(updates,null,2));
+}
 
             if(Object.keys(idxSlowQueries).includes(idx)){
               slowQuery = slowQueries[idxSlowQueries[idx]];
@@ -805,12 +843,14 @@ function slowQueries(logPattern, options = {}) {
               colWidth.ns = Math.max(colWidth.ns, ns.length);
             }
             slowQuery.plan = plan;
+            slowQuery.writes = writes.join(',');
             colWidth.totalTime = Math.max(colWidth.totalTime, slowQuery.totalTime.toString().length);
             colWidth.avgTime = Math.max(colWidth.avgTime, slowQuery.avgTime.toString().length);
             colWidth.maxTime = Math.max(colWidth.maxTime, slowQuery.maxTime.toString().length);
             colWidth.minTime = Math.max(colWidth.minTime, slowQuery.minTime.toString().length);
             colWidth.count = Math.max(colWidth.count, slowQuery.count.toString().length);
             colWidth.plan = Math.max(colWidth.plan, slowQuery.plan.length);
+            colWidth.writes = Math.max(colWidth.writes, slowQuery.writes.length);
           }
 
         }
@@ -832,6 +872,7 @@ function slowQueries(logPattern, options = {}) {
         ' | ' + 'ns'.padStart(colWidth.ns) +
         ' | ' + 'op'.padStart(colWidth.op) +
         ' | ' + 'Plan'.padEnd(colWidth.plan) +
+        ' | ' + 'Writes'.padEnd(colWidth.writes) +
         ' | Query Shape');
     print("-".padStart(Object.values(colWidth).reduce((pSum, a) => pSum+a, 0) + (Object.keys(colWidth).length * 3),'-'));
 
@@ -844,6 +885,7 @@ function slowQueries(logPattern, options = {}) {
         ' | ' + sq.ns.padEnd(colWidth.ns) +
         ' | ' + sq.op.padEnd(colWidth.op) +
         ' | ' + sq.plan.padEnd(colWidth.plan) +
+        ' | ' + sq.writes.padEnd(colWidth.plan) +
         ' | ' + sq.shape);
     });
 
@@ -862,7 +904,6 @@ function slowQueries(logPattern, options = {}) {
     lastTime = printTime;
   }
 }
-
 
 ///////////////////////////////////////////////////////////////////////////////
 
