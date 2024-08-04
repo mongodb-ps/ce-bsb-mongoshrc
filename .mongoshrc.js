@@ -747,7 +747,6 @@ function slowQueries(logPattern, options = {}) {
     ns: 'ns'.length,
     op: 'op'.length,
     plan: 'Plan'.length,
-    writes: 'Writes'.length,
     shape: 'Query Shape'.length
   };
 
@@ -758,14 +757,13 @@ function slowQueries(logPattern, options = {}) {
   var ns = '';
   var plan = '';
   var query = '';
-  var writes = [];
   var qPlan = {};
 
 
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
     logs = getLog(logPattern).results.log;
     dups = 0;
-    logs.forEach(function(val, idx) {
+    logs.forEach(function(val) {
       printTime = ISODate(val.t.$date).getTime();
       if(printTime > lastTime) {
         if(startTime == 0) { startTime = printTime }
@@ -800,8 +798,6 @@ function slowQueries(logPattern, options = {}) {
             if(!plan) {
               if(op == 'insert') {
                 plan = '';
-
-                getIndexes(ns).results.indexes.forEach( (index) => writes.push(index.name)); 
               } else {
                 if (op == 'aggregate' && !Object.keys(query[0]).includes('$match')) {
                   plan = 'COLLSCAN';
@@ -815,10 +811,11 @@ function slowQueries(logPattern, options = {}) {
                 }
               }
             }
-if(op == 'update') {
-  var updates = val.attr.command.updates;
-  print('updates: ' + JSON.stringify(updates,null,2));
-}
+
+            if(slowQueries[idxSlowQueries[idx]] && slowQueries[idxSlowQueries[idx]].plan != plan) {
+              slowQueries.splice(idxSlowQueries[idx], 1);
+              delete idxSlowQueries[idx];
+            }
 
             if(Object.keys(idxSlowQueries).includes(idx)){
               slowQuery = slowQueries[idxSlowQueries[idx]];
@@ -829,7 +826,11 @@ if(op == 'update') {
               slowQuery.totalTime += val.attr.durationMillis;
             } else {
               slowQuery = {};
-              slowQuery.shape = strShape;
+              if(op == 'insert') {
+                slowQuery.shape = '';
+              } else {
+                slowQuery.shape = strShape;
+              }
               slowQuery.op = op;
               slowQuery.ns = ns;
               slowQuery.count = 1;
@@ -843,14 +844,12 @@ if(op == 'update') {
               colWidth.ns = Math.max(colWidth.ns, ns.length);
             }
             slowQuery.plan = plan;
-            slowQuery.writes = writes.join(',');
             colWidth.totalTime = Math.max(colWidth.totalTime, slowQuery.totalTime.toString().length);
             colWidth.avgTime = Math.max(colWidth.avgTime, slowQuery.avgTime.toString().length);
             colWidth.maxTime = Math.max(colWidth.maxTime, slowQuery.maxTime.toString().length);
             colWidth.minTime = Math.max(colWidth.minTime, slowQuery.minTime.toString().length);
             colWidth.count = Math.max(colWidth.count, slowQuery.count.toString().length);
             colWidth.plan = Math.max(colWidth.plan, slowQuery.plan.length);
-            colWidth.writes = Math.max(colWidth.writes, slowQuery.writes.length);
           }
 
         }
@@ -872,7 +871,6 @@ if(op == 'update') {
         ' | ' + 'ns'.padStart(colWidth.ns) +
         ' | ' + 'op'.padStart(colWidth.op) +
         ' | ' + 'Plan'.padEnd(colWidth.plan) +
-        ' | ' + 'Writes'.padEnd(colWidth.writes) +
         ' | Query Shape');
     print("-".padStart(Object.values(colWidth).reduce((pSum, a) => pSum+a, 0) + (Object.keys(colWidth).length * 3),'-'));
 
@@ -885,7 +883,6 @@ if(op == 'update') {
         ' | ' + sq.ns.padEnd(colWidth.ns) +
         ' | ' + sq.op.padEnd(colWidth.op) +
         ' | ' + sq.plan.padEnd(colWidth.plan) +
-        ' | ' + sq.writes.padEnd(colWidth.plan) +
         ' | ' + sq.shape);
     });
 
