@@ -1,10 +1,28 @@
 
+/*
+Next:
+- Sizing sheet data
+- getBalancing()
+- balancerCollectionStatus()
+
+*/
+
 print(`
 Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
 `);
 
 var usage = {};
+
+// HELP
+usage.getHelp  =
+`getHelp(pattern)
+  Description:
+    Returns a list of all functions matching the pattern passed.
+  Parameters:
+    patter - String which matches the function name(s)
+  Returns:
+    Prints usage for functions matching the pattern given.`;
 
 function getHelp(pattern) {
   Object.keys(usage).sort().forEach(function (fnc) {
@@ -17,40 +35,58 @@ function getHelp(pattern) {
 }
 
 // Utilities
-function dbRunCommand(optDocument)
+usage.dbRunCommand  =
+`dbRunCommand(document, options)
+  Description:
+    runs db.runCommand(document, options)
+  Parameters:
+    document - command document
+    options - options for how db.RunCommand runs the command.
+  Returns:
+    Results of command run.`;
+
+function dbRunCommand(document)
 {
-  return getDatabase('admin').runCommand(optDocument);
+  return getDatabase('admin').runCommand(document);
 }
 
-function dbAdminCommand(optDocument)
+usage.dbAdminCommand  =
+`dbAdminCommand(document)
+  Description:
+    runs db.adminCommand(document)
+  Parameters:
+    document - command document
+  Returns:
+    Results of command run.`;
+
+function dbAdminCommand(document)
 {
-  return getDatabase('admin').adminCommand(optDocument);
+  return getDatabase('admin').adminCommand(document);
 }
 
 const admin = getDatabase('admin');
 const config = getDatabase('config');
 
-
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.listSessionsUsage =
-`listSessions(namespace)
+usage.listSessions =
+`listSessions(pattern, options)
   Description:
     Returns a list of all sessions minus mms-automation and mms-monitoring.
   Parameters:
-    namespace - <db>.<col>
+    pattern - Regex pattern to search for
     options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
-    <collection-object>`;
+    { ok: ..., err: <error>, results: [ <session-info> ] }`;
 
-function listSessions(regex, options = { allUsers: true } ) {
+function listSessions(pattern, options = { allUsers: true } ) {
   var ret = { ok: 1, results: [] };
 
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
     config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
-      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(regex)){
+      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
         ret.results.push(session);
       }
     });
@@ -63,24 +99,24 @@ function listSessions(regex, options = { allUsers: true } ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.listSessionsBySessionIdUsage =
-`listSessions(namespace)
+usage.listSessionsBySessionId =
+`listSessionsBySessionId(pattern, options)
   Description:
     Returns a list of all sessions minus mms-automation and mms-monitoring.
   Parameters:
-    namespace - <db>.<col>
+    pattern - Regex pattern to search for.
     options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
-    <collection-object>`;
+    { ok: ..., err: <error>, results: { sessionId: <session-info> } }`;
 
-function listSessionsBySessionId(regex, options = { allUsers: true } ) {
+function listSessionsBySessionId(pattern, options = { allUsers: true } ) {
   var ret = { ok: 1, results: {} };
 
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
-    config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
-      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(regex)){
+    listSessions(pattern, options).results.forEach((session) => {
+      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
         ret.results[session._id.id] = session;
       }
     });
@@ -91,26 +127,25 @@ function listSessionsBySessionId(regex, options = { allUsers: true } ) {
   return ret;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
-usage.listSessionsByUserIdUsage =
-`listSessions(namespace)
+usage.listSessionsByUserId =
+`listSessionsByUserId(pattern, options)
   Description:
-    Returns a list of all sessions minus mms-automation and mms-monitoring.
+    Returns a list of all sessions by user Id minus mms-automation and mms-monitoring.
   Parameters:
-    namespace - <db>.<col>
+    pattern - Regex pattern to search for.
     options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
-    <collection-object>`;
+    { ok: ..., err: <error>, results: { userId: [ <session-info>, ... ] } }`;
 
-function listSessionsByUserId(regex, options = { allUsers: true } ) {
+function listSessionsByUserId(pattern, options = { allUsers: true } ) {
   var ret = { ok: 1, results: {} };
 
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
-    config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
-      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(regex)){
+    listSessions(pattern, options).results.forEach((session) => {
+      if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
         if(!ret.results[session.user.name]) {
           ret.results[session.user.name] = [];
         }
@@ -127,7 +162,7 @@ function listSessionsByUserId(regex, options = { allUsers: true } ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.getCollectionUsage =
+usage.getCollection =
 `getCollection(namespace)
   Description:
     Gets a collection object based upon the namespace.
@@ -146,7 +181,7 @@ function getCollection(namespace) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.setDatabaseUsage =
+usage.getDatabase =
 `getDatabase(database)
   Description:
     Gets a database object based upon the namespace.
@@ -180,6 +215,7 @@ usage.dropCollections =
 function dropCollections(nsPattern) {
   var ret = { ok: 1, results: [] }
   try {
+    // Use getCollections() to confirm which collections will be dropped based upon the nsPattern
     getCollections(nsPattern).results.forEach(function(dbObjIn) {
       var db = dbObjIn.db;
       var dbObjOut = { db: db, cols: [] };
@@ -213,6 +249,7 @@ usage.dropDatabases =
 function dropDatabases(pattern) {
   var ret = { ok: 1, results: [] };
   try {
+    // Use getDatabases() to confirm which databases will be dropped based upon the nsPattern
     getDatabases(pattern).results.forEach(function(database) {
       ret.results.push(getDatabase(database).dropDatabase());
     });
@@ -267,7 +304,7 @@ usage.getCollections =
   Parameters:
     nsPattern - regex/string to limit databases/collections returned
   Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } }`;
+    { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } ] }`;
 
 function getCollections(nsPattern) {
   var ret = { ok: 1 }
@@ -294,6 +331,15 @@ function getCollections(nsPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.getEstimatedDocumentCounts =
+`getEstimatedDocumentCounts(nsPattern)
+  Description:
+    Get estimated documents counts for collections matching the nsPattern.
+  Parameters:
+    nsPattern - regex/string to limit databases/collections returned
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db.coll>, count: <count> }, ... ] }`;
+
 function getEstimatedDocumentCounts(nsPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -310,7 +356,32 @@ function getEstimatedDocumentCounts(nsPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.getDatabasesUsage =
+usage.getAvgObjSize =
+`getAvgObjSize(nsPattern)
+  Description:
+    Get the average size of documents in collections matching the nsPattern.
+  Parameters:
+    nsPattern - regex/string to limit databases/collections returned
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db.coll>, avgObjSize: <bytes> }, ... ] }`;
+
+function getAvgObjSize(nsPattern) {
+  var ret = { ok: 1 }
+  ret.results = [];
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(namespace) {
+      ret.results.push({ "ns": namespace, "avgObjSize": getCollection(namespace).stats().avgObjSize });
+    }); 
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getDatabases =
 `getDatabases(dbPattern)
   Description:
     Get databases based upon the dbPattern (regex).
@@ -372,6 +443,18 @@ function getIndexes(nsPattern, idxPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.getIndexStats =
+`getIndexStats(nsPattern, idxPattern)
+  Description:
+    Get the index stats based upon the nsPattern and idxPattern.
+    idxPattern allows you to scan the index for the name, parameters, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+
 function getIndexStats(nsPattern, idxPattern) {
   var ret = { ok: 1 }
   ret.results = [];
@@ -395,6 +478,15 @@ function getIndexStats(nsPattern, idxPattern) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+usage.getUnusedIndexes =
+`getUnusedIndexes(nsPattern)
+  Description:
+    Get the unused indexes based upon the nsPattern.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 function getUnusedIndexes(nsPattern) {
   var ret = { ok: 1 }
@@ -450,7 +542,7 @@ function getNameSpaces(nsPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.getProfilingStatus =
+usage.getProfilingStatuses =
 `getProfilingStatuses(nsPattern)
   Description:
     Gets the profiling status for all namespaces based upon the nsPattern (regex).
@@ -477,27 +569,24 @@ function getProfilingStatuses(nsPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.setProfilingLevel =
-`setProfilingLevels(nsPattern)
+usage.setProfilingLevels =
+`setProfilingLevels(nsPattern, level, options)
   Description:
     Sets the profiling status for all namespaces based upon the nsPattern (regex).
   Parameters:
     nsPattern - regex/string to limit databases returned
+    level - database profiler level
+    options - integer - sets slowms
+              document - passes options through to setProfilingLevel()
   Returns:
     { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
 
-function setProfilingLevels(nsPattern, level, msThreshold) {
+function setProfilingLevels(nsPattern, level = 0, options = { slowms: 100 }) {
   var ret = { ok: 1, results: [] };
-  if (level == null){
-    level = 0;
-  }
-  if (msThreshold == null){
-    msThreshold = 100;
-  }
   try {
     getDatabases(nsPattern).results.forEach(function(database) {
       var dbObj = { "db": database } 
-      dbObj.profilingStatus = getDatabase(database).setProfilingLevel(level, msThreshold);
+      dbObj.profilingStatus = getDatabase(database).setProfilingLevel(level, options);
       ret.results.push(dbObj);
     });
   } catch (error) {
@@ -535,6 +624,15 @@ function dbFind(nsPattern, query = {}, proj = {}, sort = {}) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+usage.splitNameSpace =
+`splitNameSpace(namespace)
+  Description:
+    Given a namespace, it returns the database and collection names.
+  Parameters:
+    namespace - namespace
+  Returns:
+    { db: <databse>, col: <collection> }`;
 
 function splitNameSpace(namespace) {
   var database = namespace.substr(0,namespace.match(/\./).index);
@@ -610,6 +708,14 @@ function setBalancing(nsPattern, enable) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+// BSB Start here - clean up
+// clean up rates. Make:
+//   {
+//     time: <s>,
+//     count: <count>,
+//     rate: <rate>
+//   }
+
 usage.tailLog =
 `tailLog(logPattern, sRunTime)
   Description:
@@ -667,35 +773,16 @@ function tailLog(logPattern, options = {}) {
   }
 }
 
-function getObjectPaths(obj) {
-  var paths = [];
-  if(typeof(obj) == 'object'
-    && obj.constructor.name == 'Array') {
-    obj.forEach((el) => {
-      if (typeof(el) == 'object') {
-        getObjectPaths(el).forEach(function (path) {
-          paths.push(path); 
-        }); 
-      }
-    });
-  } else {
-    Object.keys(obj).sort().forEach(function (key) {
-      if(!key.match(/^\$/)) {
-        paths.push(key);
-      }
-      if (typeof(obj[key]) == 'object') {
-        getObjectPaths(obj[key]).forEach(function (path) {
-          if(!key.match(/^\$/)) {
-            paths.push(key + '.' + path); 
-          } else {
-            paths.push(path); 
-          }
-        }); 
-      }
-    });
-  }
-  return paths;
-}
+///////////////////////////////////////////////////////////////////////////////
+
+usage.queryShape =
+`queryShape(query)
+  Description:
+    Gets a generic query shape for a query.
+  Parameters:
+    query - query
+  Returns (example):
+    { a: 'number', b: 'number', c: { '$in': 'Array' } }`;
 
 function queryShape(query) {
   var shape;
@@ -720,9 +807,20 @@ function queryShape(query) {
   return shape;
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.slowQueries =
+`slowQueries(logPattern, options)
+  Description:
+    Displays a list of slow queries given a logPattern. 
+  Parameters:
+    query - query
+    options.sRunTime - length of time to run the operation
+  Returns (example):
+    { a: 'number', b: 'number', c: { '$in': 'Array' } }`;
+
 function slowQueries(logPattern, options = {}) {
   var sRunTime = options.sRunTime;
-  var showRate = options.showRate;
   var logs = [];
   var rateCounter = 0;
   var startTime = 0;
