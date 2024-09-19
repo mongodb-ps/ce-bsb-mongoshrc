@@ -85,7 +85,7 @@ function listSessions(pattern, options = { allUsers: true } ) {
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
-    config.system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
+    getDatabase('config').system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
       if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
         ret.results.push(session);
       }
@@ -708,6 +708,48 @@ function setBalancing(nsPattern, enable) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.getLog =
+`getLog(logPattern, options)
+  Description:
+    Gets the log from memory using getLog admin command.
+  Parameters:
+    logPattern - regex/string used to match the log entry
+    options.type - type will be pass into getLog command; Default: 'global';
+  Returns:
+    { ok: ..., err: <error>, results: [ <log-entry>, ... ] }`;
+
+function getLog (logPattern, options = { type: 'global' } ) {
+  var ret = { ok: 1 };
+  try {
+    var sessions = listSessionsBySessionId().results;
+    var log = getDatabase('admin').adminCommand({ getLog: options.type });
+    if("log" in log) {
+      var logs = log.log;
+      log.log = [];
+      var item = {};
+      logs.forEach(function (entry) {
+        item = JSON.parse(entry);
+        if(item.attr && item.attr.command && item.attr.command.lsid && item.attr.command.lsid.id && item.attr.command.lsid.id['$uuid']) {
+          if(sessions[item.attr.command.lsid.id['$uuid']]) {
+            // If we can match the session ID to the user then add the user in
+            item.attr.user = sessions[item.attr.command.lsid.id['$uuid']].user;
+          }
+        }
+        if (JSON.stringify(item).match(logPattern)) {
+          log.log.push(item);
+        }
+      });
+    }
+    ret.results = log;
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 // BSB Start here - clean up
 // clean up rates. Make:
 //   {
@@ -816,8 +858,10 @@ usage.slowQueries =
   Parameters:
     query - query
     options.sRunTime - length of time to run the operation
-  Returns (example):
-    { a: 'number', b: 'number', c: { '$in': 'Array' } }`;
+  Prints (example):
+    tTotal | tAvg | tMax | tMin | Count |                  ns |   op | Plan     | Query Shape
+    -------------------------------------------------------------------------------------------------------
+        25 |   25 |   25 |   25 |     1 | sample_mflix.movies | find | COLLSCAN | {"directors":"string"}`;
 
 function slowQueries(logPattern, options = {}) {
   var sRunTime = options.sRunTime;
@@ -1002,32 +1046,6 @@ function slowQueries(logPattern, options = {}) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.watchCounts =
-`watchCounts(nsPattern, sRunTime, msPollTime)
-  Description:
-    Calls watchEstimatedDocumentCounts()
-    Watches the count changes on collections matching the pattern.
-  Parameters:
-    nsPattern - regex/string used to select databases/collections to watch
-    sRunTime - Seconds to run before exiting; omit to run continuously
-    msPollTime - ms between polling for counts (default: 1000)
-  Prints:
-    {
-      ns: <namespace>,
-      last: <integer>,
-      count: <integer>,
-      rate: <integer>,
-      start: <integer>,
-      change: <integer>
-    }
-    ...`;
-
-function watchCounts(nsPattern, sRunTime, msPollTime = 1000) {
-  return watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime);
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 usage.watchEstimatedDocumentCounts =
 `watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime)
   Description:
@@ -1085,11 +1103,11 @@ function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-// FIXIT
+
 usage.changeStream =
 `changeStream(ns, pipeline, options, eventHandler)
   Description:
-    Executes a change steam and, by default, just prints out change events.
+    Executes a change steam and, by default, prints out change events.
     Pipelines and options can be added along with passing in a function to handle the event.
   Parameters:
     ns - namespace
@@ -1161,36 +1179,6 @@ function getHostInfo () {
   var ret = { ok: 1 };
   try {
     ret.results = getDatabase('admin').adminCommand({ hostInfo: 1});
-  } catch (error) {
-    ret.ok = 0;
-    ret.err = error;
-  }
-  return ret; 
-}
-
-function getLog (logPattern, options = { type: 'global' } ) {
-  var ret = { ok: 1 };
-  try {
-    var sessions = listSessionsBySessionId().results;
-    var log = getDatabase('admin').adminCommand({ getLog: options.type });
-    if("log" in log) {
-      var logs = log.log;
-      log.log = [];
-      var item = {};
-      logs.forEach(function (entry) {
-        item = JSON.parse(entry);
-        if(item.attr && item.attr.command && item.attr.command.lsid && item.attr.command.lsid.id && item.attr.command.lsid.id['$uuid']) {
-          if(sessions[item.attr.command.lsid.id['$uuid']]) {
-            // If we can match the session ID to the user then add the user in
-            item.attr.user = sessions[item.attr.command.lsid.id['$uuid']].user;
-          }
-        }
-        if (JSON.stringify(item).match(logPattern)) {
-          log.log.push(item);
-        }
-      });
-    }
-    ret.results = log;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
