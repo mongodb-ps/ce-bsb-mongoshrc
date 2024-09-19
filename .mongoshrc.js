@@ -750,21 +750,14 @@ function getLog (logPattern, options = { type: 'global' } ) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// BSB Start here - clean up
-// clean up rates. Make:
-//   {
-//     time: <s>,
-//     count: <count>,
-//     rate: <rate>
-//   }
-
 usage.tailLog =
 `tailLog(logPattern, sRunTime)
   Description:
     Tails the internal log for sRunTime seconds looking for logPattern
   Parameters:
     logPattern - regex/string used to match the log entry
-    sRunTime - Seconds to run before exiting; omit to run continuously
+    options.sRunTime - Seconds to run before exiting; omit to run continuously
+    options.showRate - Show the rate of the log entries.
   Prints:
     <log-entry>
     ...`;
@@ -774,7 +767,6 @@ function tailLog(logPattern, options = {}) {
   var showRate = options.showRate;
   var logs = [];
   var rateCounter = 0;
-  var startTime = 0;
   var lastTime = 0;
   var printTime = 0;
 
@@ -783,14 +775,21 @@ function tailLog(logPattern, options = {}) {
   var msRunTime = sRunTime * 1000;
   var dups = 0;
 
+  var rate = {
+    startTime: 0,
+    duration: 0,
+    count: 0
+  };
+  isoStartTime = ISODate();
+
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
     logs = getLog(logPattern).results.log;
     dups = 0;
     logs.forEach(function(val, idx) {
       printTime = ISODate(val.t.$date).getTime();
       if(printTime > lastTime) {
-        if(startTime == 0) { startTime = printTime }
-        rateCounter += 1;
+        if(rate.startTime == 0) { isoStartTime.setTime(rate.startTime = printTime); }
+        rate.count += 1;
         print(val);
       } else {
         dups++;
@@ -798,7 +797,11 @@ function tailLog(logPattern, options = {}) {
     });
 
     if(showRate) {
-      print ("Rate: " + (rateCounter / ((printTime - startTime)/1000)).toFixed(3) + "/s"); 
+      rate.duration = (ISODate().getTime() - rate.startTime)/1000; // seconds
+      print ("startTime: " + isoStartTime);
+      print ("count: " + rate.count);
+      print ("duration (s): " + rate.duration);
+      print ("rate: " + (rate.count / rate.duration).toFixed(3) + "/s"); 
     }
 
     if(logs.length < 1024) {
