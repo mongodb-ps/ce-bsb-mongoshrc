@@ -7,6 +7,10 @@ Next:
 
 */
 
+// CONFIG
+config.set( "editor", "vi" )
+config.set( "inspectDepth", "Infinity" )
+
 print(`
 Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
@@ -63,9 +67,6 @@ function dbAdminCommand(document)
 {
   return getDatabase('admin').adminCommand(document);
 }
-
-const admin = getDatabase('admin');
-const config = getDatabase('config');
 
 ///////////////////////////////////////////////////////////////////////////////
 
