@@ -4,6 +4,9 @@ Next:
 - Sizing sheet data
 - getBalancing()
 - balancerCollectionStatus()
+- presplitting
+- currentOps:wq
+
 
 */
 
