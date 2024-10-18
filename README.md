@@ -1,6 +1,6 @@
-# MongoDB mongoshrc Plugin Library
+# .mongoshrc.js
 
-This library provides utility functions for the MongoDB `mongosh` shell, extending its capabilities with additional commands for database administration, log monitoring, and more.
+This plugin provides utility functions for the MongoDB `mongosh` shell, extending its capabilities with additional commands for database administration, log monitoring, and more.
 
 ## Table of Contents
 
