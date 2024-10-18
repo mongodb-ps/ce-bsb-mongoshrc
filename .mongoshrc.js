@@ -1324,13 +1324,23 @@ function getUserConfirmation(action, targetType, targetList) {
       return false;
   }
 
+  var auth;
+  var admin = getDatabase("admin");
+  var user = db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0].user;
+
   print('');
-  print(`Enter 'YES' (in all CAPS) at the 'Enter password' prompt to confirm this action`);
+  print(`Please provide ${user}'s password to confirm this action`);
 
-  userInput = passwordPrompt();
-  print('')
+  try {
+    auth = admin.auth(user).ok;
+  } catch (e) {
+    auth = 0;
+  }
 
-  return userInput === 'YES';
+  print('');
+
+  return auth === 1;
+
 }
 
 function silent() { return true; }
