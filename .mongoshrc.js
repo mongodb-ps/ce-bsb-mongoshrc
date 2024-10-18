@@ -212,7 +212,7 @@ usage.dropCollections =
   Returns:
     { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] }
 
-  NOTICE: This operation will prompt for user confirmation, enter 'YES' to confirm
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
           OR pass 'silent' option as the last parameter to bypass confirmation i.e:
           dropCollections(nsPattern, silent)`;
 
@@ -256,7 +256,7 @@ usage.dropDatabases =
   Returns:
     { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] }
 
-  NOTICE: This operation will prompt for user confirmation, enter 'YES' to confirm
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
           OR pass 'silent' option as the last parameter to bypass confirmation i.e:
           dropDatabases(pattern, silent)`;
 
@@ -295,7 +295,7 @@ usage.dropIndexes =
    Returns:
      { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] }
 
-  NOTICE: This operation will prompt for user confirmation, enter 'YES' to confirm
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
           OR pass 'silent' option as the last parameter to bypass confirmation i.e:
           dropIndexes(nsPattern, idxPattern, silent)`;
 
