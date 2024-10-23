@@ -3,6 +3,11 @@ Next:
 - Sizing sheet data
 - getBalancing()
 - balancerCollectionStatus()
+- presplitting
+- currentOps
+- remove dups
+- copy database
+- copy collection
 
 */
 
@@ -284,6 +289,64 @@ function getAvgObjSize(nsPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCurrentOps =
+`getCurrentOps(nsPattern)
+  Description:
+    Get indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, parameters, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+function getCurrentOps(pattern, options = { "$all": true }) {
+  var ret = { ok: 1 }
+  ret.results = [];
+  options = { currentOp: true };
+  try {
+    dbAdminCommand(options).inprog.forEach(function(op) {
+      if (JSON.stringify(op).match(pattern)) {
+        ret.results.push(op);
+      }
+    });  
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCurrentOpsWaitingForLock =
+`getCurrentOpsWaitingForLock(nsPattern)
+  Description:
+    Get indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, parameters, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+//function getCurrentOpsWaitingForLock(pattern, options = { "waitingForLock": true, $or: [ { "op" : { "$in" : [ "insert", "update", "remove" ] } }, { "command.findandmodify": { $exists: true } } ] }) {
+//  var ret = { ok: 1 }
+//  ret.results = [];
+//  options = { currentOp: true };
+//  try {
+//    getCurrentOps(pattern, options);
+//    ret.results =  dbAdminCommand(options).inprog.forEach(function(op).results;
+//  } catch (error) {
+//    ret.ok = 0;
+//    ret.err = error;
+//  }
+//  return ret;
+//}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
