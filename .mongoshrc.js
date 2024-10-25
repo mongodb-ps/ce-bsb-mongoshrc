@@ -15,8 +15,6 @@ Next:
 config.set( "editor", "vi" )
 config.set( "inspectDepth", "Infinity" )
 
-
-
 print(`
 Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
@@ -202,9 +200,131 @@ function getDatabase(database) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+// Get/Drop commands
+///////////////////////////////////////////////////////////////////////////////
 
+usage.dropCollections =
+`dropCollections(nsPattern)
+  Description:
+    Drops multiple collections depending on the regex pattern matching the namespace.
+    Use getCollections() to confirm collections to be dropped.
+  Parameters:
+    nsPattern - regex/string to limit collections/namespaces dropped
+  Returns:
+    { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] }
 
-// Get commands
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
+          OR pass 'silent' option as the last parameter to bypass confirmation i.e:
+          dropCollections(nsPattern, silent)`;
+
+function dropCollections(nsPattern, Confirmation = getUserConfirmation) {
+  var ret = { ok: 1, results: [] };
+  var cya = Confirmation;
+
+  try {
+    // Use getCollections() to confirm which collections will be dropped based upon the nsPattern
+    const results = getCollections(nsPattern).results;
+
+    if(!cya("drop", "collections", results))
+      throw `User must confirm this action ... dropCollections aborted!`;
+
+    results.forEach(function(dbObjIn) {
+      var db = dbObjIn.db;
+      var dbObjOut = { db: db, cols: [] };
+      dbObjIn.cols.forEach(function(col) {
+        dbObjOut.cols.push({ col: col, dropped: getCollection(db + '.' + col).drop() });
+      });
+      if(dbObjOut.cols.length > 0) {
+        ret.results.push(dbObjOut);
+      }
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.dropDatabases =
+`dropDatabases(pattern)
+  Description:
+    Drops multiple databases depending on the regex pattern matching database name.
+    Use getDatabases() to confirm databases to be dropped.
+  Parameters:
+    pattern - regex/string to limit databases dropped
+  Returns:
+    { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] }
+
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
+          OR pass 'silent' option as the last parameter to bypass confirmation i.e:
+          dropDatabases(pattern, silent)`;
+
+function dropDatabases(pattern, Confirmation = getUserConfirmation) {
+  var ret = { ok: 1, results: [] };
+  var cya = Confirmation;
+
+  try {
+    // Use getDatabases() to confirm which databases will be dropped based upon the nsPattern
+    const results = getDatabases(pattern).results;
+
+    if(!cya("drop", "databases", results))
+      throw `User must confirm this action ... dropDatabases aborted!`;
+
+    results.forEach(function(database) {
+      ret.results.push(getDatabase(database).dropDatabase());
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.dropIndexes = 
+`dropIndexes(nsPattern, idxPattern)
+   Description:
+     Drops multiple indexes across namespaces matching the nsPattern (regex) and
+     matching the idxPattern such as name or option.
+     Use getIndexes() to confirm indexes to be dropped.
+   Parameters:
+     nsPattern - regex/string to limit namespaces
+     idxPattern - regex/string to indexes
+   Returns:
+     { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] }
+
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
+          OR pass 'silent' option as the last parameter to bypass confirmation i.e:
+          dropIndexes(nsPattern, idxPattern, silent)`;
+
+function dropIndexes(nsPattern, idxPattern, Confirmation = getUserConfirmation) {
+  var ret = { ok: 1, results: [] };
+  var cya = Confirmation;
+
+  try {
+    const results = getIndexes(nsPattern, idxPattern).results;
+
+    if(!cya("drop", "indexes", results))
+      throw `User must confirm this action ... dropIndexes aborted!`;
+
+    results.forEach(function(nsObj) {
+      var dbObj = { "ns": nsObj.ns, results: [] };
+      nsObj.indexes.forEach(function(idx) {
+        if(idx.name !== '_id_') {
+          dbObj.results.push(getCollection(nsObj.ns).dropIndex(idx.name));
+        }
+      }); 
+      ret.results.push(dbObj);
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1217,3 +1337,69 @@ function getStableAPIStatus() {
   });
   return ret;
 }
+
+function getUserConfirmation(action, targetType, targetList) {
+  var userInput = 'NO';
+
+  print( `The following matching ${targetType} were found: ` );
+  print('');
+
+  switch (targetType) {
+    case 'databases':
+      targetList.forEach(function (dbObj) {
+        print(`   ${dbObj}`);
+      });
+
+      break;
+
+    case 'collections':
+      targetList.forEach(function (dbObj) {
+        var db = dbObj.db;
+        var cols = dbObj.cols;
+
+        cols.forEach(function (col) {
+          print(`   ${db}.${col}`);
+        });
+
+      });
+
+      break;
+
+    case 'indexes':
+      targetList.forEach(function(dbObj) {
+        var ns = dbObj.ns;
+        var idxs = dbObj.indexes;
+
+        idxs.forEach(function (idx) {
+          if (idx.name !== '_id_') {
+            print(`   ${ns}.${idx.name}`);
+          }
+        });
+      });
+
+      break;
+
+    default:
+      return false;
+  }
+
+  var auth;
+  var admin = getDatabase("admin");
+  var user = db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0].user;
+
+  print('');
+  print(`Please provide ${user}'s password to confirm this action`);
+
+  try {
+    auth = admin.auth(user).ok;
+  } catch (e) {
+    auth = 0;
+  }
+
+  print('');
+
+  return auth === 1;
+
+}
+
+function silent() { return true; }
