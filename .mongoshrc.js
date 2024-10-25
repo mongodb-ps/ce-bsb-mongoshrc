@@ -1,14 +1,18 @@
-
 /*
 Next:
 - Sizing sheet data
 - getBalancing()
 - balancerCollectionStatus()
 - presplitting
-- currentOps:wq
-
-
+- currentOps
+- remove dups
+- copy database
+- copy collection
 */
+
+// CONFIG
+config.set( "editor", "vi" )
+config.set( "inspectDepth", "Infinity" )
 
 print(`
 Type 'getHelp()' to list usage.
@@ -66,9 +70,6 @@ function dbAdminCommand(document)
 {
   return getDatabase('admin').adminCommand(document);
 }
-
-const admin = getDatabase('admin');
-const config = getDatabase('config');
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -198,10 +199,7 @@ function getDatabase(database) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-
 // Get/Drop commands
-
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.dropCollections =
@@ -213,13 +211,23 @@ usage.dropCollections =
     nsPattern - regex/string to limit collections/namespaces dropped
   Returns:
     { ok: ..., err: <error>, results: [ { db: <db>, cols: [ { col: <col>, dropped: <result> } ] } ] }
-  WARNING: THIS DOES NOT PROMPT FOR CONFIRMATION.`;
 
-function dropCollections(nsPattern) {
-  var ret = { ok: 1, results: [] }
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
+          OR pass 'silent' option as the last parameter to bypass confirmation i.e:
+          dropCollections(nsPattern, silent)`;
+
+function dropCollections(nsPattern, Confirmation = getUserConfirmation) {
+  var ret = { ok: 1, results: [] };
+  var cya = Confirmation;
+
   try {
     // Use getCollections() to confirm which collections will be dropped based upon the nsPattern
-    getCollections(nsPattern).results.forEach(function(dbObjIn) {
+    const results = getCollections(nsPattern).results;
+
+    if(!cya("drop", "collections", results))
+      throw `User must confirm this action ... dropCollections aborted!`;
+
+    results.forEach(function(dbObjIn) {
       var db = dbObjIn.db;
       var dbObjOut = { db: db, cols: [] };
       dbObjIn.cols.forEach(function(col) {
@@ -247,13 +255,23 @@ usage.dropDatabases =
     pattern - regex/string to limit databases dropped
   Returns:
     { ok: ..., err: <error>, results: [ { ok: 1, dropped: <db> } ] }
-  WARNING: THIS DOES NOT PROMPT FOR CONFIRMATION.`;
 
-function dropDatabases(pattern) {
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
+          OR pass 'silent' option as the last parameter to bypass confirmation i.e:
+          dropDatabases(pattern, silent)`;
+
+function dropDatabases(pattern, Confirmation = getUserConfirmation) {
   var ret = { ok: 1, results: [] };
+  var cya = Confirmation;
+
   try {
     // Use getDatabases() to confirm which databases will be dropped based upon the nsPattern
-    getDatabases(pattern).results.forEach(function(database) {
+    const results = getDatabases(pattern).results;
+
+    if(!cya("drop", "databases", results))
+      throw `User must confirm this action ... dropDatabases aborted!`;
+
+    results.forEach(function(database) {
       ret.results.push(getDatabase(database).dropDatabase());
     });
   } catch (error) {
@@ -276,14 +294,23 @@ usage.dropIndexes =
      idxPattern - regex/string to indexes
    Returns:
      { ok: ..., err: <error>, results: { ns: <namespace>, result: [ { nIndexesWas: ..., ok: ..., "$clusterTime": { clusterTime: ..., signature: ..., keyId: ...  } }, operationTime: ...  } ] }
-   WARNING: THIS DOES NOT PROMPT FOR CONFIRMATION.`;
 
-function dropIndexes(nsPattern, idxPattern) {
-  ret = { ok: 1 }
-  ret.results = [];
+  NOTICE: This operation will prompt for user confirmation, enter password to confirm
+          OR pass 'silent' option as the last parameter to bypass confirmation i.e:
+          dropIndexes(nsPattern, idxPattern, silent)`;
+
+function dropIndexes(nsPattern, idxPattern, Confirmation = getUserConfirmation) {
+  var ret = { ok: 1, results: [] };
+  var cya = Confirmation;
+
   try {
-    getIndexes(nsPattern, idxPattern).results.forEach(function(nsObj) {
-      var dbObj = { "ns": nsObj.ns, results: [] }
+    const results = getIndexes(nsPattern, idxPattern).results;
+
+    if(!cya("drop", "indexes", results))
+      throw `User must confirm this action ... dropIndexes aborted!`;
+
+    results.forEach(function(nsObj) {
+      var dbObj = { "ns": nsObj.ns, results: [] };
       nsObj.indexes.forEach(function(idx) {
         if(idx.name !== '_id_') {
           dbObj.results.push(getCollection(nsObj.ns).dropIndex(idx.name));
@@ -381,6 +408,64 @@ function getAvgObjSize(nsPattern) {
   }
   return ret;
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCurrentOps =
+`getCurrentOps(nsPattern)
+  Description:
+    Get indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, parameters, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+function getCurrentOps(pattern, options = { "$all": true }) {
+  var ret = { ok: 1 }
+  ret.results = [];
+  options = { currentOp: true };
+  try {
+    dbAdminCommand(options).inprog.forEach(function(op) {
+      if (JSON.stringify(op).match(pattern)) {
+        ret.results.push(op);
+      }
+    });  
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getCurrentOpsWaitingForLock =
+`getCurrentOpsWaitingForLock(nsPattern)
+  Description:
+    Get indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, parameters, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+//function getCurrentOpsWaitingForLock(pattern, options = { "waitingForLock": true, $or: [ { "op" : { "$in" : [ "insert", "update", "remove" ] } }, { "command.findandmodify": { $exists: true } } ] }) {
+//  var ret = { ok: 1 }
+//  ret.results = [];
+//  options = { currentOp: true };
+//  try {
+//    getCurrentOps(pattern, options);
+//    ret.results =  dbAdminCommand(options).inprog.forEach(function(op).results;
+//  } catch (error) {
+//    ret.ok = 0;
+//    ret.err = error;
+//  }
+//  return ret;
+//}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1251,3 +1336,69 @@ function getStableAPIStatus() {
   });
   return ret;
 }
+
+function getUserConfirmation(action, targetType, targetList) {
+  var userInput = 'NO';
+
+  print( `The following matching ${targetType} were found: ` );
+  print('');
+
+  switch (targetType) {
+    case 'databases':
+      targetList.forEach(function (dbObj) {
+        print(`   ${dbObj}`);
+      });
+
+      break;
+
+    case 'collections':
+      targetList.forEach(function (dbObj) {
+        var db = dbObj.db;
+        var cols = dbObj.cols;
+
+        cols.forEach(function (col) {
+          print(`   ${db}.${col}`);
+        });
+
+      });
+
+      break;
+
+    case 'indexes':
+      targetList.forEach(function(dbObj) {
+        var ns = dbObj.ns;
+        var idxs = dbObj.indexes;
+
+        idxs.forEach(function (idx) {
+          if (idx.name !== '_id_') {
+            print(`   ${ns}.${idx.name}`);
+          }
+        });
+      });
+
+      break;
+
+    default:
+      return false;
+  }
+
+  var auth;
+  var admin = getDatabase("admin");
+  var user = db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0].user;
+
+  print('');
+  print(`Please provide ${user}'s password to confirm this action`);
+
+  try {
+    auth = admin.auth(user).ok;
+  } catch (e) {
+    auth = 0;
+  }
+
+  print('');
+
+  return auth === 1;
+
+}
+
+function silent() { return true; }
