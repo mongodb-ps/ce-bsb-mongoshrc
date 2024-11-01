@@ -8,6 +8,8 @@ Next:
 - remove dups
 - copy database
 - copy collection
+- clusterType (sharded / replica)
+- 
 */
 
 // CONFIG
