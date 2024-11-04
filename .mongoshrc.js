@@ -8,6 +8,7 @@ Next:
 - remove dups
 - copy database
 - copy collection
+- clusterType (sharded / replica)
 */
 
 // CONFIG
@@ -39,6 +40,20 @@ function getHelp(pattern) {
     }
   });
   print('-----');
+}
+
+// HELP
+usage.reload  =
+`reload()
+  Description:
+    Reloads the plugin.
+  Parameters:
+    <none>
+  Returns:
+    <nothing>`;
+
+function reload() {
+  load('.mongoshrc.js');
 }
 
 // Utilities
@@ -1225,6 +1240,48 @@ function changeStream(ns, pipeline = [], options = {}, eventHandler = function(e
     ret.err = error;
   }
   return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getSizingInfo =
+`getSizingInfo(pattern)
+  Description:
+    Prints the sizing info for the cluster based upon the pattern
+  Parameters:
+    pattern - pattern that namespace much match`;
+
+function getSizingInfo(pattern) {
+  var ret = { ok: 1, results: {}, string: "" };
+  var ns;
+  try {
+    getCollections(pattern).results.forEach(function(dbObj) {
+//print("dbObj.db:" + JSON.stringify(dbObj));
+      if(!(dbObj.db in ret.results)) {
+        ret.results[dbObj.db] = {}; 
+      }
+      dbObj.cols.forEach(function(item) {
+print("col:" + item);
+      ns = dbObj.db + '.' + item;
+print("ns:" + ns);
+        var stats = getCollection(ns).stats();
+        ret.results[dbObj.db][item] = {
+          count: stats.count,
+          docSize: stats.size,
+          avgDocSize: stats.size/stats.count,
+          indexSize: stats.totalIndexSize,
+          avgIndexSize: stats.totalIndexSize/stats.count,
+          wtCompressionRatio: stats.storageSize/stats.size,
+          numIndexes: stats.nindexes
+        };
+        ret.string += dbObj.db + "," + item + "," + stats.count + "," + stats.size + "," + stats.size/stats.count + "," + stats.totalIndexSize + "," + stats.totalIndexSize/stats.count + "," + stats.storageSize/stats.size + "," + stats.nindexes + "\n";
+      });
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
