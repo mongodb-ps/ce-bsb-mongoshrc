@@ -1256,14 +1256,11 @@ function getSizingInfo(pattern) {
   var ns;
   try {
     getCollections(pattern).results.forEach(function(dbObj) {
-//print("dbObj.db:" + JSON.stringify(dbObj));
       if(!(dbObj.db in ret.results)) {
         ret.results[dbObj.db] = {}; 
       }
       dbObj.cols.forEach(function(item) {
-print("col:" + item);
       ns = dbObj.db + '.' + item;
-print("ns:" + ns);
         var stats = getCollection(ns).stats();
         ret.results[dbObj.db][item] = {
           count: stats.count,
