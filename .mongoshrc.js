@@ -1259,10 +1259,10 @@ function getSizingInfo(pattern) {
       if(!(dbObj.db in ret.results)) {
         ret.results[dbObj.db] = {}; 
       }
-      dbObj.cols.forEach(function(item) {
-      ns = dbObj.db + '.' + item;
+      dbObj.cols.forEach(function(col) {
+      ns = dbObj.db + '.' + col;
         var stats = getCollection(ns).stats();
-        ret.results[dbObj.db][item] = {
+        ret.results[dbObj.db][col] = {
           count: stats.count,
           docSize: stats.size,
           avgDocSize: stats.size/stats.count,
@@ -1271,7 +1271,7 @@ function getSizingInfo(pattern) {
           wtCompressionRatio: stats.storageSize/stats.size,
           numIndexes: stats.nindexes
         };
-        ret.string += dbObj.db + "," + item + "," + stats.count + "," + stats.size + "," + stats.size/stats.count + "," + stats.totalIndexSize + "," + stats.totalIndexSize/stats.count + "," + stats.storageSize/stats.size + "," + stats.nindexes + "\n";
+        ret.string += dbObj.db + "," + col + "," + stats.count + "," + stats.size + "," + stats.size/stats.count + "," + stats.totalIndexSize + "," + stats.totalIndexSize/stats.count + "," + stats.storageSize/stats.size + "," + stats.nindexes + "\n";
       });
     });
   } catch (error) {
