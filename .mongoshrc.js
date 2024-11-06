@@ -564,8 +564,12 @@ function getIndexStats(nsPattern, idxPattern) {
   try {
     getNameSpaces(nsPattern).results.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
-      getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
+      var col = getCollection(ns);
+      stats = col.stats();                                        // May want to write getStats()
+      dbObj.totalIndexSize = stats.totalIndexSize;
+      col.aggregate([{$indexStats:{}}]).forEach(function(idx) {
         if (JSON.stringify(idx).match(idxPattern)) {
+          idx.size = stats.indexSizes[idx.name];
           dbObj.indexes.push(idx);
         }
       });  
