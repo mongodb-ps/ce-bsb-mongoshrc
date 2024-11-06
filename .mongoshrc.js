@@ -8,6 +8,7 @@ Next:
 - remove dups
 - copy database
 - copy collection
+- clusterType (sharded / replica)
 */
 
 // CONFIG
@@ -39,6 +40,20 @@ function getHelp(pattern) {
     }
   });
   print('-----');
+}
+
+// HELP
+usage.reload  =
+`reload()
+  Description:
+    Reloads the plugin.
+  Parameters:
+    <none>
+  Returns:
+    <nothing>`;
+
+function reload() {
+  load('.mongoshrc.js');
 }
 
 // Utilities
@@ -549,8 +564,12 @@ function getIndexStats(nsPattern, idxPattern) {
   try {
     getNameSpaces(nsPattern).results.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
-      getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
+      var col = getCollection(ns);
+      stats = col.stats();                                        // May want to write getStats()
+      dbObj.totalIndexSize = stats.totalIndexSize;
+      col.aggregate([{$indexStats:{}}]).forEach(function(idx) {
         if (JSON.stringify(idx).match(idxPattern)) {
+          idx.size = stats.indexSizes[idx.name];
           dbObj.indexes.push(idx);
         }
       });  
@@ -1225,6 +1244,45 @@ function changeStream(ns, pipeline = [], options = {}, eventHandler = function(e
     ret.err = error;
   }
   return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getSizingInfo =
+`getSizingInfo(pattern)
+  Description:
+    Prints the sizing info for the cluster based upon the pattern
+  Parameters:
+    pattern - pattern that namespace much match`;
+
+function getSizingInfo(pattern) {
+  var ret = { ok: 1, results: {}, string: "" };
+  var ns;
+  try {
+    getCollections(pattern).results.forEach(function(dbObj) {
+      if(!(dbObj.db in ret.results)) {
+        ret.results[dbObj.db] = {}; 
+      }
+      dbObj.cols.forEach(function(col) {
+      ns = dbObj.db + '.' + col;
+        var stats = getCollection(ns).stats();
+        ret.results[dbObj.db][col] = {
+          count: stats.count,
+          docSize: stats.size,
+          avgDocSize: stats.size/stats.count,
+          indexSize: stats.totalIndexSize,
+          avgIndexSize: stats.totalIndexSize/stats.count,
+          wtCompressionRatio: stats.storageSize/stats.size,
+          numIndexes: stats.nindexes
+        };
+        ret.string += dbObj.db + "," + col + "," + stats.count + "," + stats.size + "," + stats.size/stats.count + "," + stats.totalIndexSize + "," + stats.totalIndexSize/stats.count + "," + stats.storageSize/stats.size + "," + stats.nindexes + "\n";
+      });
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
 }
 
 ///////////////////////////////////////////////////////////////////////////////
