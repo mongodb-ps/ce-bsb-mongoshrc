@@ -16,12 +16,20 @@ Next:
 config.set( "editor", "vi" )
 config.set( "inspectDepth", "Infinity" )
 
+const os = require('os');
+const homeDir = os.homedir();
+
 print(`
 Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
 `);
 
 var usage = {};
+
+// WARNING: DESTRUCTIVE MODULE
+//   - uncomment to load drop* functions
+
+// load(homeDir + "/.mongoshrc-destructive.js");
 
 // HELP
 usage.getHelp  =
