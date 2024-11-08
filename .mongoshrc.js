@@ -1,6 +1,5 @@
 /*
 Next:
-- Sizing sheet data
 - getBalancing()
 - balancerCollectionStatus()
 - presplitting
@@ -9,6 +8,8 @@ Next:
 - copy database
 - copy collection
 - clusterType (sharded / replica)
+- mongoexport / mongoimport
+- mongodump / mongorestore
 */
 
 // CONFIG
@@ -442,9 +443,13 @@ function getIndexStats(nsPattern, idxPattern) {
       var col = getCollection(ns);
       stats = col.stats();                                        // May want to write getStats()
       dbObj.totalIndexSize = stats.totalIndexSize;
+      dbObj.avgIndexSize = stats.totalIndexSize / stats.count;
+      dbObj.nIndexes = stats.nindexes;
+      dbObj.docCount = stats.count;
       col.aggregate([{$indexStats:{}}]).forEach(function(idx) {
         if (JSON.stringify(idx).match(idxPattern)) {
           idx.size = stats.indexSizes[idx.name];
+          idx.avgSize = stats.indexSizes[idx.name] / stats.count;
           dbObj.indexes.push(idx);
         }
       });  
@@ -731,6 +736,9 @@ function getLog (logPattern, options = { type: 'global' } ) {
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+// ToDo:
+// - add a save to file option
 
 usage.tailLog =
 `tailLog(logPattern, sRunTime)
