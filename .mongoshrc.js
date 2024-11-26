@@ -11,6 +11,7 @@ Next:
 - mongoexport / mongoimport
 - mongodump / mongorestore
 - presplit
+- oplog size
 */
 
 // CONFIG
@@ -111,6 +112,36 @@ function decodeObjectId(objId) {
     ret.results.time = parseInt(objId.toString().substring(0,8),16) * 1000;  
     ret.results.random = parseInt(objId.toString().substring(8,18),16);  
     ret.results.counter = parseInt(objId.toString().substring(18,24),16);  
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+usage.getOplogStats  =
+`decodeObjectId(div)
+  Description:
+    Gets the current stats for the oplog
+  Parameters:
+    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;
+  Returns:
+    Oplog size, Oplog storage size, Oplog earliest/latest dates, etc..`;
+
+function getOplogStats(div = 1) {
+  var ret = { ok: 1, results: {} };
+  try {
+    oplog = getCollection('local.oplog.rs');
+    stats = oplog.stats();
+    ret.results.time = {};
+    ret.results.time.earliest = oplog.aggregate([ { $sort: { ts: 1 } }, { $limit: 1 }, { $project: { ts: { $toDate: '$ts' } } }] ).toArray()[0].ts;
+    ret.results.time.latest = oplog.aggregate([ { $sort: { ts: -1 } }, { $limit: 1 }, { $project: { ts: { $toDate: '$ts' } } }] ).toArray()[0].ts;
+    ret.results.time.seconds = (ret.results.time.latest.getTime() - ret.results.time.earliest.getTime()) / 1000;
+    ret.results.count = stats.count;
+    ret.results.avgObjSize = stats.avgObjSize / div;
+    ret.results.size = stats.size / div;
+    ret.results.storageSize = stats.storageSize / div;
+    ret.results.avgBytesPerHour = ret.results.storageSize / (ret.results.time.seconds / 60 / 60);
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
