@@ -29,9 +29,13 @@ Type 'getHelp(<regex>) to get specific usage for functions.
 var usage = {};
 
 // WARNING: DESTRUCTIVE MODULE
-//   - uncomment to load drop* functions
+const MONGOSH_PLUGIN = process.env.MONGOSH_PLUGIN
 
-load(homeDir + "/.mongoshrc-destructive.js");
+// If the MONGOSH environment variable is set to 'EXPERT'
+// then load mutable functions like drop*()
+if(MONGOSH_PLUGIN == 'EXPERT') {
+  load(homeDir + "/.mongoshrc-expert.js");
+}
 
 // HELP
 usage.getHelp  =
