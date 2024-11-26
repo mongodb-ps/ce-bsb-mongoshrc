@@ -10,6 +10,7 @@ Next:
 - clusterType (sharded / replica)
 - mongoexport / mongoimport
 - mongodump / mongorestore
+- presplit
 */
 
 // CONFIG
@@ -29,7 +30,7 @@ var usage = {};
 // WARNING: DESTRUCTIVE MODULE
 //   - uncomment to load drop* functions
 
-// load(homeDir + "/.mongoshrc-destructive.js");
+load(homeDir + "/.mongoshrc-destructive.js");
 
 // HELP
 usage.getHelp  =
@@ -93,6 +94,28 @@ usage.dbAdminCommand  =
 function dbAdminCommand(document)
 {
   return getDatabase('admin').adminCommand(document);
+}
+
+usage.decodeObjectId  =
+`decodeObjectId(objId)
+  Description:
+    Breaks the ObjectId down to its individual components
+  Parameters:
+    objId - an ObjectId
+  Returns:
+    Time, random number for machine/process, and counter encoded in the ObjectId.`;
+
+function decodeObjectId(objId) {
+  var ret = { ok: 1, results: {} };
+  try {
+    ret.results.time = parseInt(objId.toString().substring(0,8),16) * 1000;  
+    ret.results.random = parseInt(objId.toString().substring(8,18),16);  
+    ret.results.counter = parseInt(objId.toString().substring(18,24),16);  
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
