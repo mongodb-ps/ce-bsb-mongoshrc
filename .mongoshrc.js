@@ -34,7 +34,11 @@ const MONGOSH_PLUGIN = process.env.MONGOSH_PLUGIN
 // If the MONGOSH environment variable is set to 'EXPERT'
 // then load mutable functions like drop*()
 if(MONGOSH_PLUGIN == 'EXPERT') {
+  print(`EXPERT MODE ENABLED! BE CAREFUL!!!`);
+
   load(homeDir + "/.mongoshrc-expert.js");
+} else {
+  print(`Set environment variable, MONGOSH_PLUGIN, to EXPERT to get drop*() functions.`);
 }
 
 // HELP
