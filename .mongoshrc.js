@@ -11,7 +11,6 @@ Next:
 - mongoexport / mongoimport
 - mongodump / mongorestore
 - presplit
-- oplog size
 */
 
 // CONFIG
@@ -19,6 +18,7 @@ config.set( "editor", "vi" )
 config.set( "inspectDepth", "Infinity" )
 
 const os = require('os');
+const fs = require('fs');
 const homeDir = os.homedir();
 
 print(`
@@ -383,10 +383,11 @@ usage.getCurrentOps =
   Returns:
     { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
-function getCurrentOps(pattern, options = { "$all": true }) {
+// Not too keen on how this one worked out. currentOp: true has to be the first element in associative array.
+
+function getCurrentOps(pattern, options = { currentOp: true, "$all": true }) {
   var ret = { ok: 1 }
   ret.results = [];
-  options = { currentOp: true };
   try {
     dbAdminCommand(options).inprog.forEach(function(op) {
       if (JSON.stringify(op).match(pattern)) {
@@ -398,6 +399,40 @@ function getCurrentOps(pattern, options = { "$all": true }) {
     ret.err = error;
   }
   return ret;
+}
+
+const currentOps = {
+  allOps: {
+    currentOp: true,
+    "$all": true
+  },
+  writeOpsWaitingForLock: {
+    currentOp: true,
+    "waitingForLock" : true,
+    $or: [
+      { "op" : { "$in" : [ "insert", "update", "remove" ] } },
+      { "command.findandmodify": { $exists: true } }
+    ]
+  },
+  activeOpsNoYields: {
+    currentOp: true,
+    "active" : true,
+    "numYields" : 0,
+    "waitingForLock" : false
+  },
+  activeOpsSpecificDatbase: {
+    currentOp: true,
+    "active" : true,
+    "secs_running" : { "$gt" : 3 },
+    "ns" : /^db1\./
+  },
+  activeIndexingOps: {
+    currentOp: true,
+    $or: [
+      { op: "command", "command.createIndexes": { $exists: true }  },
+      { op: "none", "msg" : /^Index Build/ }
+    ]
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -811,13 +846,14 @@ function getLog (logPattern, options = { type: 'global' } ) {
 // - add a save to file option
 
 usage.tailLog =
-`tailLog(logPattern, sRunTime)
+`tailLog(logPattern, options)
   Description:
     Tails the internal log for sRunTime seconds looking for logPattern
   Parameters:
     logPattern - regex/string used to match the log entry
     options.sRunTime - Seconds to run before exiting; omit to run continuously
     options.showRate - Show the rate of the log entries.
+    options.file - file to write to
   Prints:
     <log-entry>
     ...`;
@@ -851,6 +887,11 @@ function tailLog(logPattern, options = {}) {
         if(rate.startTime == 0) { isoStartTime.setTime(rate.startTime = printTime); }
         rate.count += 1;
         print(val);
+        if(options.file != undefined) {
+          fs.appendFile(options.file, JSON.stringify(val) + "\n", err => {
+            if (err) throw err;
+          });
+        }
       } else {
         dups++;
       }
@@ -1192,6 +1233,64 @@ function changeStream(ns, pipeline = [], options = {}, eventHandler = function(e
         next = cursor.tryNext();
       }
     }
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getWiredTigerCacheSize =
+`getCacheStats()
+  Description:
+    Returns the WiredTiger Cache size.`;
+
+function getWiredTigerCacheSize() {
+  var ret = { ok: 1 };
+  try {
+    ret.results = db.serverStatus().wiredTiger.cache["maximum bytes configured"];
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getWiredTigerCacheStats =
+`getCacheStats(ns)
+  Description:
+    Returns what is currently in cache.
+  Parameters:
+    ns - namespace`;
+
+function getWiredTigerCacheStats(ns) {
+  var ret = { ok: 1, results: {} };
+
+  try {
+    ret.results.totalSize = getWiredTigerCacheSize().results;
+    ret.results.allocated = 0;
+    ret.results.free = ret.results.totalSize;
+    ret.results.allocatedPercent = 0;
+    ret.results.freePercent = 0;
+    ret.results.inCache = [];
+    getNameSpaces(ns).results.forEach(function (ns) {
+      var colStats = getCollection(ns).stats({ indexDetails: true });
+      ret.results.inCache.push({
+        ns: ns,
+        docs: colStats.wiredTiger.cache["bytes currently in the cache"],
+        indexes: colStats.indexDetails._id_.cache["bytes currently in the cache"],
+        docsPercent: colStats.wiredTiger.cache["bytes currently in the cache"] / ret.results.totalSize * 100,
+        indexesPercent: colStats.indexDetails._id_.cache["bytes currently in the cache"] / ret.results.totalSize * 100
+      });
+      ret.results.allocated += colStats.wiredTiger.cache["bytes currently in the cache"] + colStats.indexDetails._id_.cache["bytes currently in the cache"];
+      ret.results.free -= colStats.wiredTiger.cache["bytes currently in the cache"] + colStats.indexDetails._id_.cache["bytes currently in the cache"];
+    });
+    ret.results.allocatedPercent = ret.results.allocated / ret.results.totalSize * 100;
+    ret.results.freePercent = ret.results.free / ret.results.totalSize * 100;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
