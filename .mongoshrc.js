@@ -41,6 +41,9 @@ if(MONGOSH_PLUGIN == 'EXPERT') {
   print(`Set environment variable, MONGOSH_PLUGIN, to EXPERT to get drop*() functions.`);
 }
 
+// Place for static data for each instanace;
+var static = { };
+
 // HELP
 usage.getHelp  =
 `getHelp(pattern)
@@ -1243,14 +1246,16 @@ function changeStream(ns, pipeline = [], options = {}, eventHandler = function(e
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.getWiredTigerCacheSize =
-`getCacheStats()
+`getCacheStats(div)
   Description:
-    Returns the WiredTiger Cache size.`;
+    Returns the WiredTiger Cache size.
+  Parameters
+    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
 
-function getWiredTigerCacheSize() {
+function getWiredTigerCacheSize(div = 1) {
   var ret = { ok: 1 };
   try {
-    ret.results = db.serverStatus().wiredTiger.cache["maximum bytes configured"];
+    ret.results = (static.wiredTigerCacheSize ||= db.serverStatus().wiredTiger.cache["maximum bytes configured"]) / div;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1261,33 +1266,34 @@ function getWiredTigerCacheSize() {
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.getWiredTigerCacheStats =
-`getCacheStats(ns)
+`getCacheStats(ns, div)
   Description:
     Returns what is currently in cache.
   Parameters:
-    ns - namespace`;
+    ns - namespace
+    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
 
-function getWiredTigerCacheStats(ns) {
+function getWiredTigerCacheStats(ns, div = 1) {
   var ret = { ok: 1, results: {} };
 
   try {
-    ret.results.totalSize = getWiredTigerCacheSize().results;
+    ret.results.totalSize = getWiredTigerCacheSize(div).results;
     ret.results.allocated = 0;
     ret.results.free = ret.results.totalSize;
     ret.results.allocatedPercent = 0;
     ret.results.freePercent = 0;
     ret.results.inCache = [];
+    var current = {};
     getNameSpaces(ns).results.forEach(function (ns) {
       var colStats = getCollection(ns).stats({ indexDetails: true });
-      ret.results.inCache.push({
-        ns: ns,
-        docs: colStats.wiredTiger.cache["bytes currently in the cache"],
-        indexes: colStats.indexDetails._id_.cache["bytes currently in the cache"],
-        docsPercent: colStats.wiredTiger.cache["bytes currently in the cache"] / ret.results.totalSize * 100,
-        indexesPercent: colStats.indexDetails._id_.cache["bytes currently in the cache"] / ret.results.totalSize * 100
-      });
-      ret.results.allocated += colStats.wiredTiger.cache["bytes currently in the cache"] + colStats.indexDetails._id_.cache["bytes currently in the cache"];
-      ret.results.free -= colStats.wiredTiger.cache["bytes currently in the cache"] + colStats.indexDetails._id_.cache["bytes currently in the cache"];
+      current.ns = ns;
+      current.docs = colStats.wiredTiger.cache["bytes currently in the cache"] / div;
+      current.indexes = colStats.indexDetails._id_.cache["bytes currently in the cache"] / div;
+      current.docsPercent = current.docs / ret.results.totalSize * 100;
+      current.indexesPercent = current.indexes / ret.results.totalSize * 100;
+      ret.results.inCache.push(current);
+      ret.results.allocated += current.docs + current.indexes;
+      ret.results.free -= current.docs + current.indexes;
     });
     ret.results.allocatedPercent = ret.results.allocated / ret.results.totalSize * 100;
     ret.results.freePercent = ret.results.free / ret.results.totalSize * 100;
@@ -1296,6 +1302,95 @@ function getWiredTigerCacheStats(ns) {
     ret.err = error;
   }
   return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.watchWiredTigerCacheStats =
+`getCacheStats(ns, div)
+  Description:
+    Returns what is currently in cache.
+  Parameters:
+    ns - namespace
+    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
+
+function watchWiredTigerCacheStats(ns, div = 1) {
+  var ret = { ok: 1, results: {} };
+
+  try {
+    while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
+      wtcStats = getWiredTigerCacheStats();
+      print("");
+    }
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+function printTable(table) {
+  var cw = {};
+  var headings = [];
+  var justify = {};
+  table.headings.forEach( h => {
+    headings.push(h.name);
+    justify[h.name] = h.justify;
+  });
+  var data = table.data;
+  // Use the headings to set the size of the columns
+  headings.forEach( h => {
+    cw[h] = h.length;
+  });
+  data.forEach( d => {
+    headings.forEach( h => {
+      cw[h] = Math.max(cw[h], d[h].toString().length);
+    });
+  });
+
+  // print headings
+  var line = '';
+  headings.forEach( h => {
+    if(justify[h] == 'R'){
+      line += h.padStart(cw[h]);
+    } else if (justify[h] == 'L') {
+      line += h.padEnd(cw[h])
+    } else if (justify[h] == 'C') {
+      line += h.substr(0, Math.ceil(h.length / 2)).padStart(Math.ceil(cw[h]/2)) + h.substr(Math.ceil(h.length/2)).padEnd(Math.floor(cw[h]/2))
+    } else {
+      line += cw[h];
+    }
+    line += (h != headings[headings.length - 1]) ? ' | ' : '';
+  });
+  print(line);
+
+  print("-".padStart(Object.values(cw).reduce((pSum, a) => pSum+a, 0) + ((Object.keys(cw).length - 1) * 3),'-'));
+
+  // print data
+  data.forEach(d => {
+    line = '';
+    headings.forEach( h => {
+      if(justify[h] == 'R'){
+        line += d[h].toString().padStart(cw[h])
+      } else if (justify[h] == 'L') {
+        line += d[h].toString().padEnd(cw[h])
+      } else if (justify[h] == 'C') {
+        line += d[h].substr(0, Math.ceil(d[h].length / 2)).padStart(Math.ceil(cw[h]/2)) + d[h].substr(Math.ceil(d[h].length/2)).padEnd(Math.floor(cw[h]/2))
+      } else {
+        line += cw[h];
+      }
+      line += (h != headings[headings.length - 1]) ? ' | ' : '';
+    });
+    print(line);
+  });
+}
+
+// Report test table
+testTable = {
+  headings: [{name: "CENTERED", justify: 'C'},{name: 'Collection', justify: 'L'}, { name: 'Average', justify: 'R'}, { name: 'Total', justify: 'R'} ],
+  data: [
+    { CENTERED: "zzzzzzzzzzzzzzz", Collection: 'bishop.brad', Average: 4.5, Total: 10 }
+  ]
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1512,3 +1607,4 @@ function getUserConfirmation(action, targetType, targetList) {
 }
 
 function silent() { return true; }
+
