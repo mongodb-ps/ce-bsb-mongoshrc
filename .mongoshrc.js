@@ -1258,37 +1258,50 @@ function getWiredTigerCacheSize(div = 1) {
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.getWiredTigerCacheStats =
-`getCacheStats(ns, div)
+`getCacheStats(ns, options)
   Description:
     Returns what is currently in cache.
   Parameters:
     ns - namespace
-    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
+    options.div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
 
-function getWiredTigerCacheStats(ns, div = 1) {
+function getWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
   var ret = { ok: 1, results: {} };
 
   try {
-    ret.results.totalSize = getWiredTigerCacheSize(div).results;
+    ret.results.totalSize = getWiredTigerCacheSize(options.div).results;
     ret.results.allocated = 0;
     ret.results.free = ret.results.totalSize;
     ret.results.allocatedPercent = 0;
     ret.results.freePercent = 0;
     ret.results.inCache = [];
-    var current = {};
     getNameSpaces(ns).results.forEach(function (ns) {
+      var current = {};
       var colStats = getCollection(ns).stats({ indexDetails: true });
       current.ns = ns;
-      current.docs = colStats.wiredTiger.cache["bytes currently in the cache"] / div;
-      current.indexes = colStats.indexDetails._id_.cache["bytes currently in the cache"] / div;
+      current.docs = colStats.wiredTiger.cache["bytes currently in the cache"] / options.div;
+      current.indexes = colStats.indexDetails._id_.cache["bytes currently in the cache"] / options.div;
       current.docsPercent = current.docs / ret.results.totalSize * 100;
       current.indexesPercent = current.indexes / ret.results.totalSize * 100;
-      ret.results.inCache.push(current);
       ret.results.allocated += current.docs + current.indexes;
       ret.results.free -= current.docs + current.indexes;
+      ret.results.inCache.push(current);
     });
     ret.results.allocatedPercent = ret.results.allocated / ret.results.totalSize * 100;
     ret.results.freePercent = ret.results.free / ret.results.totalSize * 100;
+    if(options.fixed != null) {
+      ret.results.totalSize = ret.results.totalSize.toFixed(options.fixed);
+      ret.results.allocated = ret.results.allocated.toFixed(options.fixed);
+      ret.results.allocatedPercent = ret.results.allocatedPercent.toFixed(options.fixed);
+      ret.results.free = ret.results.free.toFixed(options.fixed);
+      ret.results.freePercent = ret.results.freePercent.toFixed(options.fixed);
+      ret.results.inCache.forEach( item => {
+        item.docs = item.docs.toFixed(options.fixed);
+        item.indexes = item.indexes.toFixed(options.fixed);
+        item.docsPercent = item.docsPercent.toFixed(options.fixed);
+        item.indexesPercent = item.indexesPercent.toFixed(options.fixed);
+      });
+    }
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1299,20 +1312,39 @@ function getWiredTigerCacheStats(ns, div = 1) {
 ///////////////////////////////////////////////////////////////////////////////
 
 usage.watchWiredTigerCacheStats =
-`getCacheStats(ns, div)
+`watchWiredTigerCacheStats(ns, options)
   Description:
-    Returns what is currently in cache.
+    Displays what is currently in cache.
   Parameters:
     ns - namespace
-    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
+    options.div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
 
-function watchWiredTigerCacheStats(ns, div = 1) {
+function watchWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
   var ret = { ok: 1, results: {} };
+
+  var sRunTime = options.sRunTime;
+  var msRunTime = sRunTime * 1000;
+
+  var table = {
+    headings: [
+      { name: 'ns', justify: 'R' },
+      { name: 'docs', justify: 'R' },
+      { name: 'docsPercent', justify: 'R' },
+      { name: 'indexes', justify: 'R' },
+      { name: 'indexesPercent', justify: 'R' }
+    ]
+  };
 
   try {
     while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-      wtcStats = getWiredTigerCacheStats();
-      print("");
+      wtcStats = getWiredTigerCacheStats(ns,options);
+      table.data = wtcStats.results.inCache;
+      print("Total Size: " + wtcStats.results.totalSize);
+      print("Allocated: " + wtcStats.results.allocated);
+      print("Free: " + wtcStats.results.free);
+      printTable(table);
+      print("\n\n\n");
+      sleep(1);
     }
   } catch (error) {
     ret.ok = 0;
