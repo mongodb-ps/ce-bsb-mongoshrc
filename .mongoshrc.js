@@ -1324,14 +1324,36 @@ function watchWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
 
   var sRunTime = options.sRunTime;
   var msRunTime = sRunTime * 1000;
+  var unit = 'unknown';
+
+  switch (options.div) {
+    case 1:
+      unit = 'B';
+      break; 
+    case 1024:
+      unit = 'KB';
+      break; 
+    case 1024*1024:
+      unit = 'MB';
+      break; 
+    case 1024*1024*1024:
+      unit = 'GB';
+      break; 
+    case 1024*1024*1024*1024:
+      unit = 'TB';
+      break; 
+    case 1024*1024*1024*1024*1024:
+      unit = 'PB';
+      break; 
+  }
 
   var table = {
     headings: [
       { name: 'ns', justify: 'R' },
-      { name: 'docs', justify: 'R' },
-      { name: 'docsPercent', justify: 'R' },
-      { name: 'indexes', justify: 'R' },
-      { name: 'indexesPercent', justify: 'R' }
+      { name: 'docs', justify: 'R', unit: unit },
+      { name: 'docsPercent', justify: 'R', unit: '%' },
+      { name: 'indexes', justify: 'R', unit: unit },
+      { name: 'indexesPercent', justify: 'R', unit: '%' }
     ]
   };
 
@@ -1346,8 +1368,6 @@ function watchWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
       print("Free: " + wtcStats.results.free);
       printTable(table);
       print("\n");
-      print("Note: Everything is in B/KB/MB/GB/etc. depending on options.div. These are not counts.");
-      print("\n");
       sleep(1);
     }
   } catch (error) {
@@ -1361,14 +1381,22 @@ function printTable(table) {
   var cw = {};
   var headings = [];
   var justify = {};
+  var unit = {};
   table.headings.forEach( h => {
     headings.push(h.name);
     justify[h.name] = h.justify;
+    //unit[h.name] = ('unit' in h ? h.unit : null);
+    unit[h.name] = h.unit || null;
   });
+
   var data = table.data;
   // Use the headings to set the size of the columns
   headings.forEach( h => {
-    cw[h] = h.length;
+    if(unit[h] != null) {
+      cw[h] = h.length + unit[h].length + 1;
+    } else {
+      cw[h] = h.length;
+    }
   });
   data.forEach( d => {
     headings.forEach( h => {
@@ -1378,13 +1406,19 @@ function printTable(table) {
 
   // print headings
   var line = '';
+  var heading = '';
   headings.forEach( h => {
+    if(unit[h] != null) {
+      heading = h + ' ' + unit[h];
+    } else {
+      heading = h;
+    }
     if(justify[h] == 'R'){
-      line += h.padStart(cw[h]);
+      line += heading.padStart(cw[h]);
     } else if (justify[h] == 'L') {
-      line += h.padEnd(cw[h])
+      line += heading.padEnd(cw[h])
     } else if (justify[h] == 'C') {
-      line += h.substr(0, Math.ceil(h.length / 2)).padStart(Math.ceil(cw[h]/2)) + h.substr(Math.ceil(h.length/2)).padEnd(Math.floor(cw[h]/2))
+      line += heading.substr(0, Math.ceil(h.length / 2)).padStart(Math.ceil(cw[h]/2)) + heading.substr(Math.ceil(h.length/2)).padEnd(Math.floor(cw[h]/2))
     } else {
       line += cw[h];
     }
