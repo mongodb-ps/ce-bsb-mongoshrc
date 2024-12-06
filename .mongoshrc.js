@@ -1339,11 +1339,15 @@ function watchWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
     while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
       wtcStats = getWiredTigerCacheStats(ns,options);
       table.data = wtcStats.results.inCache;
+      print("\n");
+      print("WIRED TIGER CACHE CONTENTS");
       print("Total Size: " + wtcStats.results.totalSize);
       print("Allocated: " + wtcStats.results.allocated);
       print("Free: " + wtcStats.results.free);
       printTable(table);
-      print("\n\n\n");
+      print("\n");
+      print("Note: Everything is in B/KB/MB/GB/etc. depending on options.div. These are not counts.");
+      print("\n");
       sleep(1);
     }
   } catch (error) {
