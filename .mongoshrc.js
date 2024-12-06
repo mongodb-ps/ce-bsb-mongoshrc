@@ -988,15 +988,15 @@ function slowQueries(logPattern, options = {}) {
 
   var slowQuery = {};
   var colWidth = {
-    totalTime: 'tTotal'.length,
-    avgTime: 'tAvg'.length,
-    maxTime: 'tMax'.length,
-    minTime: 'tMin'.length,
-    count: 'Count'.length,
+    tTotal: 'tTotal'.length,
+    tAvg: 'tAvg'.length,
+    tMax: 'tMax'.length,
+    tMin: 'tMin'.length,
+    Count: 'Count'.length,
     ns: 'ns'.length,
     op: 'op'.length,
-    plan: 'Plan'.length,
-    shape: 'Query Shape'.length
+    Plan: 'Plan'.length,
+    Shape: 'Shape'.length
   };
 
   var op = '';
@@ -1068,37 +1068,37 @@ function slowQueries(logPattern, options = {}) {
 
             if(Object.keys(idxSlowQueries).includes(idx)){
               slowQuery = slowQueries[idxSlowQueries[idx]];
-              slowQuery.count++;
-              slowQuery.maxTime = Math.max(slowQuery.maxTime, val.attr.durationMillis);
-              slowQuery.minTime = Math.min(slowQuery.minTime, val.attr.durationMillis);
-              slowQuery.avgTime = slowQuery.totalTime / slowQuery.count;
-              slowQuery.totalTime += val.attr.durationMillis;
+              slowQuery.Count++;
+              slowQuery.tMax = Math.max(slowQuery.maxTime, val.attr.durationMillis);
+              slowQuery.tMin = Math.min(slowQuery.minTime, val.attr.durationMillis);
+              slowQuery.tAvg = slowQuery.totalTime / slowQuery.count;
+              slowQuery.tTotal += val.attr.durationMillis;
             } else {
               slowQuery = {};
               if(op == 'insert') {
-                slowQuery.shape = '';
+                slowQuery.Shape = '';
               } else {
-                slowQuery.shape = strShape;
+                slowQuery.Shape = strShape;
               }
               slowQuery.op = op;
               slowQuery.ns = ns;
-              slowQuery.count = 1;
-              slowQuery.maxTime = val.attr.durationMillis;
-              slowQuery.minTime = val.attr.durationMillis;
-              slowQuery.totalTime = val.attr.durationMillis;
-              slowQuery.avgTime = slowQuery.totalTime / slowQuery.count;
+              slowQuery.Count = 1;
+              slowQuery.tMax = val.attr.durationMillis;
+              slowQuery.tMin = val.attr.durationMillis;
+              slowQuery.tTotal = val.attr.durationMillis;
+              slowQuery.tAvg = slowQuery.tTotal / slowQuery.Count;
               idxSlowQueries[idx] = slowQueries.push(slowQuery) - 1;
-              colWidth.shape = Math.max(colWidth.shape, slowQuery.shape.length);
+              colWidth.Shape = Math.max(colWidth.Shape, slowQuery.Shape.length);
               colWidth.op = Math.max(colWidth.op, op.length);
               colWidth.ns = Math.max(colWidth.ns, ns.length);
             }
-            slowQuery.plan = plan;
-            colWidth.totalTime = Math.max(colWidth.totalTime, slowQuery.totalTime.toString().length);
-            colWidth.avgTime = Math.max(colWidth.avgTime, slowQuery.avgTime.toString().length);
-            colWidth.maxTime = Math.max(colWidth.maxTime, slowQuery.maxTime.toString().length);
-            colWidth.minTime = Math.max(colWidth.minTime, slowQuery.minTime.toString().length);
-            colWidth.count = Math.max(colWidth.count, slowQuery.count.toString().length);
-            colWidth.plan = Math.max(colWidth.plan, slowQuery.plan.length);
+            slowQuery.Plan = plan;
+            colWidth.tTime = Math.max(colWidth.tTotal, slowQuery.tTotal.toString().length);
+            colWidth.tAvg = Math.max(colWidth.tAvg, slowQuery.tAvg.toString().length);
+            colWidth.tMax = Math.max(colWidth.tMax, slowQuery.tMax.toString().length);
+            colWidth.tMin = Math.max(colWidth.tMin, slowQuery.tMin.toString().length);
+            colWidth.Count = Math.max(colWidth.Count, slowQuery.Count.toString().length);
+            colWidth.Plan = Math.max(colWidth.Plan, slowQuery.Plan.length);
           }
 
         }
@@ -1107,34 +1107,26 @@ function slowQueries(logPattern, options = {}) {
       }
     });
 
-    slowQueries.sort((a,b) => b.totalTime - a.totalTime);
+    slowQueries.sort((a,b) => b.tTotal - a.tTotal);
     slowQueries.forEach((q,i) => {
-      idxSlowQueries[q.op + ':' + q.shape] = i;
+      idxSlowQueries[q.op + ':' + q.Shape] = i;
     });
 
-    print('tTotal'.padStart(colWidth.totalTime) +
-        ' | ' + 'tAvg'.padStart(colWidth.avgTime) +
-        ' | ' + 'tMax'.padStart(colWidth.maxTime) +
-        ' | ' + 'tMin'.padStart(colWidth.minTime) +
-        ' | ' + 'Count'.padStart(colWidth.count) +
-        ' | ' + 'ns'.padStart(colWidth.ns) +
-        ' | ' + 'op'.padStart(colWidth.op) +
-        ' | ' + 'Plan'.padEnd(colWidth.plan) +
-        ' | Query Shape');
-    print("-".padStart(Object.values(colWidth).reduce((pSum, a) => pSum+a, 0) + (Object.keys(colWidth).length * 3),'-'));
+    var table = {};
+    table.headings = [
+      { name: 'tTotal', justify: 'R' },
+      { name: 'tAvg', justify: 'R' },
+      { name: 'tMax', justify: 'R' },
+      { name: 'tMin', justify: 'R' },
+      { name: 'Count', justify: 'R' },
+      { name: 'ns', justify: 'R' },
+      { name: 'op', justify: 'R' },
+      { name: 'Plan', justify: 'R' },
+      { name: 'Shape', justify: 'L' },
+    ];
+    table.data = slowQueries;
 
-    slowQueries.forEach((sq) => {
-      print(sq.totalTime.toString().padStart(colWidth.totalTime) +
-        ' | ' + sq.avgTime.toString().padStart(colWidth.avgTime) +
-        ' | ' + sq.maxTime.toString().padStart(colWidth.maxTime) +
-        ' | ' + sq.minTime.toString().padStart(colWidth.minTime) +
-        ' | ' + sq.count.toString().padStart(colWidth.count) +
-        ' | ' + sq.ns.padEnd(colWidth.ns) +
-        ' | ' + sq.op.padEnd(colWidth.op) +
-        ' | ' + sq.plan.padEnd(colWidth.plan) +
-        ' | ' + sq.shape);
-    });
-
+    printTable(table);
     print("\n\n\n");
 
     if(logs.length < 1024) {
