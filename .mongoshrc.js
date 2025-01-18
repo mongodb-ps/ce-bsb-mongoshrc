@@ -11,6 +11,7 @@ Next:
 - mongoexport / mongoimport
 - mongodump / mongorestore
 - presplit
+- time machine
 */
 
 // CONFIG
@@ -1236,6 +1237,49 @@ function changeStream(ns, pipeline = [], options = {}, eventHandler = function(e
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+usage.findArchivedDocument =
+`findArchivedDocument(nsArchive, query, options, eventHandler)
+  Description:
+    Executes a change steam and, by default, prints out change events.
+    Pipelines and options can be added along with passing in a function to handle the event.
+  Parameters:
+    ns - namespace
+    pipeline - (optional) A pipeline which will be  passed into watch(); Default: []
+    options - (optional) Options passed into watch(); Default: {}
+    eventHandler - A function which will be pass the event; Default: function which prints the event`;
+
+csArchive = function(event){db.csArchive.insert(event)};
+
+function findArchivedDocument(nsArchive, query, sortDocument = { clusterTime: 1} ) {
+  var ret = { ok: 1 , results: null};
+  try {
+    var fullDocument = null;
+    var archive = getCollection(nsArchive); 
+    var cursor = archive.find(query).sort(sortDocument);
+    while(cursor.hasNext()) {
+      event = cursor.next();
+      if(['insert', 'replace'].includes(event.operationType)) {
+        fullDocument = event.fullDocument;
+      } else if (event.operationType == 'update') {
+        fullDocument = { ...fullDocument, ...event.updateDescription.updatedFields };
+        event.updateDescription.removedFields.forEach( function (path) {
+          fullDocument = deleteKey(fullDocument, path);
+        });
+      } else if (event.operationType == 'delete') {
+        fullDocument = null;
+      }
+      print ("operation:" + event.operationType);
+      print ("fullDocument:" + JSON.stringify(fullDocument,null,2));
+    }
+    ret.results = fullDocument;
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 
 usage.getWiredTigerCacheSize =
 `getCacheStats(div)
@@ -1496,7 +1540,28 @@ function getSizingInfo(pattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Keyhole
+usage.getStartupWarnings =
+`getStartupWarnings()
+  Description:
+    Returns startup warnings.`
+ 
+function getStartupWarnings () {
+  var ret = { ok: 1 };
+  try {
+    ret.results = getDatabase('admin').adminCommand({ getLog: 'startupWarnings' });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getBuildInfo =
+`getBuildInfo()
+  Description:
+    Returns startup warnings.`
 
 function getBuildInfo() {
   var ret = { ok: 1 };
@@ -1508,6 +1573,11 @@ function getBuildInfo() {
   }
   return ret; 
 }
+
+ 
+///////////////////////////////////////////////////////////////////////////////
+
+// Keyhole
 
 // FIXIT
 function getCollStats(nsPattern) {
@@ -1537,17 +1607,6 @@ function getHostInfo () {
   var ret = { ok: 1 };
   try {
     ret.results = getDatabase('admin').adminCommand({ hostInfo: 1});
-  } catch (error) {
-    ret.ok = 0;
-    ret.err = error;
-  }
-  return ret; 
-}
-
-function getStartupWarnings () {
-  var ret = { ok: 1 };
-  try {
-    ret.results = getDatabase('admin').adminCommand({ getLog: 'startupWarnings' });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1586,6 +1645,21 @@ function addTime(startTime, seconds) {
   var retTime = ISODate();
   retTime.setTime(startTime.getTime() + seconds);
   return retTime;
+}
+
+function deleteKey(obj, path) {
+    const _obj = JSON.parse(JSON.stringify(obj));
+    const keys = path.split('.');
+
+    keys.reduce((acc, key, index) => {
+        if (index === keys.length - 1) {
+            delete acc[key];
+            return true;
+        }
+        return acc[key];
+    }, _obj);
+
+    return _obj;
 }
 
 function getStableAPIStatus() {
