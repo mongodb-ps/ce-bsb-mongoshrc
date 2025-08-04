@@ -22,6 +22,8 @@ const os = require('os');
 const fs = require('fs');
 const homeDir = os.homedir();
 
+const maxAtlasSearchDocuments=2000000000;
+
 print(`
 Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
@@ -40,6 +42,11 @@ if(MONGOSH_PLUGIN == 'EXPERT') {
   load(homeDir + "/.mongoshrc-expert.js");
 } else {
   print(`Set environment variable, MONGOSH_PLUGIN, to EXPERT to get drop*() functions.`);
+}
+
+// Date w/o Time
+Date.prototype.getDateWithoutTime = function () {
+    return new Date(this.toDateString());
 }
 
 // Place for static data for each instanace;
@@ -124,36 +131,6 @@ function decodeObjectId(objId) {
     ret.results.time = parseInt(objId.toString().substring(0,8),16) * 1000;  
     ret.results.random = parseInt(objId.toString().substring(8,18),16);  
     ret.results.counter = parseInt(objId.toString().substring(18,24),16);  
-  } catch (error) {
-    ret.ok = 0;
-    ret.err = error;
-  }
-  return ret;
-}
-
-usage.getOplogStats  =
-`decodeObjectId(div)
-  Description:
-    Gets the current stats for the oplog
-  Parameters:
-    div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;
-  Returns:
-    Oplog size, Oplog storage size, Oplog earliest/latest dates, etc..`;
-
-function getOplogStats(div = 1) {
-  var ret = { ok: 1, results: {} };
-  try {
-    oplog = getCollection('local.oplog.rs');
-    stats = oplog.stats();
-    ret.results.time = {};
-    ret.results.time.earliest = oplog.aggregate([ { $sort: { ts: 1 } }, { $limit: 1 }, { $project: { ts: { $toDate: '$ts' } } }] ).toArray()[0].ts;
-    ret.results.time.latest = oplog.aggregate([ { $sort: { ts: -1 } }, { $limit: 1 }, { $project: { ts: { $toDate: '$ts' } } }] ).toArray()[0].ts;
-    ret.results.time.seconds = (ret.results.time.latest.getTime() - ret.results.time.earliest.getTime()) / 1000;
-    ret.results.count = stats.count;
-    ret.results.avgObjSize = stats.avgObjSize / div;
-    ret.results.size = stats.size / div;
-    ret.results.storageSize = stats.storageSize / div;
-    ret.results.avgBytesPerHour = ret.results.storageSize / (ret.results.time.seconds / 60 / 60);
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -342,6 +319,40 @@ function getEstimatedDocumentCounts(nsPattern) {
     getNameSpaces(nsPattern).results.forEach(function(namespace) {
       ret.results.push({ "ns": namespace, "count": getCollection(namespace).estimatedDocumentCount() });
     }); 
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getAtlasSearchDocCount =
+`getAtlasSearchDocCount(nsPattern)
+  Description:
+    Get estimated documents counts for Atlas Search as it has a limit of
+    2B docs per replicaset / shard
+  Parameters:
+    nsPattern - regex/string to limit databases/collections returned
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db.coll>, count: <count> }, ... ] }`;
+
+function getAtlasSearchDocCount(nsPattern) {
+  var ret = { ok: 1 }
+  ret.results = {};
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(namespace) {
+      var stats = getCollection(namespace).stats();
+      ret.results[namespace] = [];
+      if (isShardedCluster() == true ){
+        Object.keys(stats.shards).forEach(function (sh) {
+          ret.results[namespace].push({shard: sh, count: stats.shards[sh].count, percent: (stats.shards[sh].count/ maxAtlasSearchDocuments) * 100});
+        });
+      } else {
+        ret.results[namespace].push({count: stats.count, percent: (stats.count/ maxAtlasSearchDocuments) * 100});
+      }
+    });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1595,7 +1606,7 @@ function getCollStats(nsPattern) {
 function getConnPoolStats() {
   var ret = { ok: 1, results: [] };
   try {
-    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
+    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 }); // BSB FIX THIS!
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1624,6 +1635,18 @@ function getCmdLineOpts () {
   }
   return ret; 
 
+}
+
+function isStandAlone() {
+  return (isReplicaSet() || isShardedCluster()) ? false : true;
+}
+
+function isReplicaSet() {
+  return getCmdLineOpts().results.parsed['replication'] != undefined;
+}
+
+function isShardedCluster() {
+  return getCmdLineOpts().results.parsed['sharding'] != undefined;
 }
 
 function getBuildInfo() {
