@@ -1585,6 +1585,36 @@ function getBuildInfo() {
   return ret; 
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getConnections =
+`getConnections()
+  Description:
+    Returns current connections from current operations.`
+
+function getConnections() {
+  var ret = { ok: 1 };
+  try {
+    ret.results = db.currentOp(true).inprog.reduce(
+      (accumulator, connection) => {
+        let ipaddress = connection.client ? connection.client.split(":")[0] : "Internal";
+        if (accumulator[ipaddress]) {
+          accumulator[ipaddress] += 1;
+        } else {
+          accumulator[ipaddress] = 1;
+        }
+        return accumulator;
+      },
+      {}
+    );
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+ 
  
 ///////////////////////////////////////////////////////////////////////////////
 
