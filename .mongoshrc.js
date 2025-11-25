@@ -51,6 +51,8 @@ Date.prototype.getDateWithoutTime = function () {
 
 // Place for static data for each instanace;
 var static = { };
+var dynamic = { };
+dynamic.timestamps = { };
 
 // HELP
 usage.getHelp  =
@@ -116,6 +118,8 @@ function dbAdminCommand(document)
   return getDatabase('admin').adminCommand(document);
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
 usage.decodeObjectId  =
 `decodeObjectId(objId)
   Description:
@@ -136,6 +140,29 @@ function decodeObjectId(objId) {
     ret.err = error;
   }
   return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getTimestamp  =
+`getTimestamp(epoch = , count = 1)
+  Description:
+    Returns a current timestamp. Includes counter.
+  Parameters:
+    epoch - seconds since 1970-01-01T00:00:00
+  Returns:
+    Timestamp.`;
+
+
+function getTimestamp(epoch = parseInt(new Date().getTime()/1000), count) {
+  if(count === undefined) {
+    if(epoch in dynamic.timestamps) {
+      count = ++dynamic.timestamps[epoch];
+    } else {
+      count = dynamic.timestamps[epoch] = 1;
+    }
+  }
+  return new Timestamp(epoch,count);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
