@@ -89,6 +89,32 @@ function reload() {
 }
 
 // Utilities
+
+usage.login  =
+`login()
+  Description:
+    Stores credentials in session variables.
+    Used when needing to connect to other nodes in the cluster.
+  Returns:
+    N/A.`;
+
+function login()
+{
+  static['password'] = passwordPrompt();
+}
+
+usage.clearPassword  =
+`clearPassword()
+  Description:
+    Removes password from being stored internally in the session.
+  Returns:
+    N/A.`;
+
+function clearPassword()
+{
+  delete static['password'];
+}
+
 usage.dbRunCommand  =
 `dbRunCommand(document, options)
   Description:
@@ -1286,28 +1312,26 @@ usage.findArchivedDocument =
     options - (optional) Options passed into watch(); Default: {}
     eventHandler - A function which will be pass the event; Default: function which prints the event`;
 
-csArchive = function(event){db.csArchive.insert(event)};
+csArchive = function(event){db.csArchive.insertOne(event)};
 
 function findArchivedDocument(nsArchive, query, sortDocument = { clusterTime: 1} ) {
   var ret = { ok: 1 , results: null};
   try {
     var fullDocument = null;
-    var archive = getCollection(nsArchive); 
+    var archive = getCollection(nsArchive);
     var cursor = archive.find(query).sort(sortDocument);
     while(cursor.hasNext()) {
       event = cursor.next();
       if(['insert', 'replace'].includes(event.operationType)) {
         fullDocument = event.fullDocument;
       } else if (event.operationType == 'update') {
-        fullDocument = { ...fullDocument, ...event.updateDescription.updatedFields };
+        fullDocument = mergeObjects(fullDocument, event.updateDescription.updatedFields);
         event.updateDescription.removedFields.forEach( function (path) {
           fullDocument = deleteKey(fullDocument, path);
         });
       } else if (event.operationType == 'delete') {
         fullDocument = null;
       }
-      print ("operation:" + event.operationType);
-      print ("fullDocument:" + JSON.stringify(fullDocument,null,2));
     }
     ret.results = fullDocument;
   } catch (error) {
@@ -1315,6 +1339,21 @@ function findArchivedDocument(nsArchive, query, sortDocument = { clusterTime: 1}
     ret.err = error;
   }
   return ret;
+}
+
+function mergeObjects (fullDoc, changeDoc) {
+  Object.keys(changeDoc).forEach(key => {
+    subDoc = fullDoc;
+    keys = key.split('.');
+    keys.forEach( k => {
+      if(keys.indexOf(k) != keys.length - 1) {
+        subDoc = subDoc[k] ||= {};
+      } else {
+        subDoc[k] = changeDoc[key];
+      } 
+    });
+  });
+  return fullDoc;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1557,16 +1596,19 @@ function getSizingInfo(pattern) {
       dbObj.cols.forEach(function(col) {
       ns = dbObj.db + '.' + col;
         var stats = getCollection(ns).stats();
+        var blockManager = stats.wiredTiger['block-manager'];
         ret.results[dbObj.db][col] = {
-          count: stats.count,
-          docSize: stats.size,
-          avgDocSize: stats.size/stats.count,
-          indexSize: stats.totalIndexSize,
           avgIndexSize: stats.totalIndexSize/stats.count,
-          wtCompressionRatio: stats.storageSize/stats.size,
-          numIndexes: stats.nindexes
+          avgObjSize: stats.avgObjSize,
+          count: stats.count,
+          fragmentation: (blockManager['file bytes available for reuse']/stats.storageSize) * 100,
+          nIndexes: stats.nindexes,
+          size: stats.size,
+          storageSize: stats.storageSize,
+          totalIndexSize: stats.totalIndexSize,
+          wtCompressionRatio: (stats.storageSize - blockManager['file bytes available for reuse'])/stats.size,
         };
-        ret.string += dbObj.db + "," + col + "," + stats.count + "," + stats.size + "," + stats.size/stats.count + "," + stats.totalIndexSize + "," + stats.totalIndexSize/stats.count + "," + stats.storageSize/stats.size + "," + stats.nindexes + "\n";
+        ret.string += dbObj.db + "," + col + "," + stats.count + "," + stats.size + "," + stats.avgObjSize + "," + stats.totalIndexSize + "," + stats.totalIndexSize/stats.count + "," + (stats.storageSize - blockManager['file bytes available for reuse'])/stats.size + "," + stats.nindexes + "\n";
       });
     });
   } catch (error) {
