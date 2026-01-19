@@ -29,6 +29,8 @@ Type 'getHelp()' to list usage.
 Type 'getHelp(<regex>) to get specific usage for functions.
 `);
 
+const dbStart = db;
+
 var usage = {};
 
 // WARNING: DESTRUCTIVE MODULE
@@ -1683,6 +1685,256 @@ function getConnections() {
   return ret; 
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getShardedClusterHosts =
+`getShardClusterHosts()
+  Description:
+    Gets list of hosts for the replica set.`
+
+function getShardedClusterHosts() {
+  var ret = { ok: 1, results: {} };
+  try {
+    ret.results = [];
+    var hosts = '';
+    getDatabase('config').shards.find().toArray().forEach( shard => {
+      hosts = shard.host;
+      hosts = hosts.slice(hosts.search('/')+1)
+      ret.results[shard._id] = hosts.split(',');
+
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+ 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.getReplicaSetHosts =
+`getReplicaSetHosts()
+  Description:
+    Gets list of hosts for the replica set.`
+
+function getReplicaSetHosts() {
+  var ret = { ok: 1 };
+  try {
+    ret.results = [];
+    rs.config().members.forEach( member => { ret.results.push(member.host) });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+ 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.buildConnectionString =
+`buildConnectionString(hostname)
+  Description:
+    Connects to each host; Run login() first.
+  Parameters:
+    hostname - hostname
+    port - port
+  Returns:
+    mongodb connection string.`
+
+function buildConnectionString(hostname) {
+  var ret = { ok: 1 };
+  try {
+    static.user ||= db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0].user;
+    ret.results = `mongodb://${static.user}:${static.password}@${hostname}/?tls=true`;
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+ 
+///////////////////////////////////////////////////////////////////////////////
+
+usage.connectHosts =
+`connectHosts()
+  Description:
+    Connects to each host; Run login() first.`
+
+function connectHosts() {
+  var ret = { ok: 1, results: [] };
+  try {
+    if(static.password == undefined) {
+      login();
+    }
+
+    if(static.nodes == undefined) {
+      if(isShardedCluster() == true) {
+        var shHosts = getShardedClusterHosts().results;
+        Object.keys(shHosts).forEach( shard => {
+          shHosts[shard].forEach(host => {
+            static["nodes"] ||= {};
+            static["nodes"][host] = connect(buildConnectionString(host).results);
+          });
+        });
+      } else if (isReplicaSet() == true) {
+        var rsStatus = {};
+        rs.status().members.forEach( member => {
+          rsStatus[member.name] = {
+            "id": member._id,
+            "stateStr": member.stateStr
+          }
+        });
+        getReplicaSetHosts().results.forEach( host => { 
+          static["nodes"] ||= {};
+          static["nodes"][host] = connect(buildConnectionString(host).results);
+        });
+      }
+      ret.results = static["nodes"];
+    }
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.reConnectHosts =
+`reConnectHosts()
+  Description:
+    re-connects to each host`
+
+function reConnectHosts() {
+  var ret = { ok: 1, results: [] };
+  try {
+    delete static['nodes'];
+    ret = connectHosts();
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+  
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.connectShards =
+`connectShards()
+  Description:
+    Connects to each shard; Run login() first.`
+
+function connectShards() {
+  var ret = { ok: 1, results: [] };
+  try {
+    if(isShardedCluster() == true) {
+      var shHosts = getShardedClusterHosts().results;
+      var hosts = '';
+      static["shards"] ||= {};
+      Object.keys(shHosts).forEach( shard => {
+        hosts = shHosts[shard].join(',');
+        strConn = buildConnectionString(hosts).results;
+        static["shards"][shard] = connect(buildConnectionString(hosts).results);
+      });
+    }
+    ret.results = static["shards"];
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.useStart =
+`useStart()
+  Description:
+    Switches to the original connection.`
+
+function useStart() {
+  var ret = { ok: 1, results: {} };
+  try {
+    ret.results['db'] = db = dbStart;
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.usePrimary =
+`usePrimary()
+  Description:
+    Switches connection to the primary node.`
+
+function usePrimary() {
+  var ret = { ok: 1, results: {} };
+  try {
+    if(static.nodes == undefined) {
+      connectHosts();
+    }
+    rs.status().members.forEach( member => {
+      if(member.stateStr == 'PRIMARY') {
+        ret.results['host'] = member.name;
+        ret.results['db'] = db = static.nodes[member.name];
+      }
+    });
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.nextSecondary =
+`nextSecondary()
+  Description:
+    Switches connection to the next secondary node.`
+
+function nextSecondary() {
+  var ret = { ok: 1, results: {} };
+  try {
+
+    if(static.nodes == undefined) {
+      connectHosts();
+    }
+
+    var members = rs.status().members;
+    var firstSecondary;
+    var currSecondary;
+    var nextSecondary;
+    members.forEach( member => {
+      if(member.stateStr == 'SECONDARY') {
+        if(firstSecondary == undefined) {
+          firstSecondary = member.name;
+        }
+
+        if(db == static.nodes[member.name]){
+          currSecondary = member.name;;
+          return;
+        } 
+
+        if(currSecondary != undefined) {
+          nextSecondary = member.name;
+        }
+      }
+    });
+    ret.results['host'] = nextSecondary ||= firstSecondary;
+    ret.results['db'] = db = static.nodes[nextSecondary];
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+ 
  
  
 ///////////////////////////////////////////////////////////////////////////////
