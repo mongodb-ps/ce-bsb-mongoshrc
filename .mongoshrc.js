@@ -158,11 +158,11 @@ usage.decodeObjectId  =
     Time, random number for machine/process, and counter encoded in the ObjectId.`;
 
 function decodeObjectId(objId) {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
   try {
-    ret.results.time = parseInt(objId.toString().substring(0,8),16) * 1000;  
-    ret.results.random = parseInt(objId.toString().substring(8,18),16);  
-    ret.results.counter = parseInt(objId.toString().substring(18,24),16);  
+    ret.result.time = parseInt(objId.toString().substring(0,8),16) * 1000;  
+    ret.result.random = parseInt(objId.toString().substring(8,18),16);  
+    ret.result.counter = parseInt(objId.toString().substring(18,24),16);  
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -203,17 +203,17 @@ usage.listSessions =
     pattern - Regex pattern to search for
     options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
-    { ok: ..., err: <error>, results: [ <session-info> ] }`;
+    { ok: ..., err: <error>, result: [ <session-info> ] }`;
 
 function listSessions(pattern, options = { allUsers: true } ) {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
 
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
     getDatabase('config').system.sessions.aggregate([{$listSessions: options}]).toArray().forEach((session) => {
       if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
-        ret.results.push(session);
+        ret.result.push(session);
       }
     });
   } catch (error) {
@@ -233,17 +233,17 @@ usage.listSessionsBySessionId =
     pattern - Regex pattern to search for.
     options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
-    { ok: ..., err: <error>, results: { sessionId: <session-info> } }`;
+    { ok: ..., err: <error>, result: { sessionId: <session-info> } }`;
 
 function listSessionsBySessionId(pattern, options = { allUsers: true } ) {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
 
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
-    listSessions(pattern, options).results.forEach((session) => {
+    listSessions(pattern, options).result.forEach((session) => {
       if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
-        ret.results[session._id.id] = session;
+        ret.result[session._id.id] = session;
       }
     });
   } catch (error) {
@@ -262,20 +262,20 @@ usage.listSessionsByUserId =
     pattern - Regex pattern to search for.
     options - (optional) Options to pass to $listSession. Default: { allUsers: true }
   Returns:
-    { ok: ..., err: <error>, results: { userId: [ <session-info>, ... ] } }`;
+    { ok: ..., err: <error>, result: { userId: [ <session-info>, ... ] } }`;
 
 function listSessionsByUserId(pattern, options = { allUsers: true } ) {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
 
   var skip = ['mms-automation@admin', 'mms-monitoring-agent@admin', 'mms-mongot@admin']
  
   try {
-    listSessions(pattern, options).results.forEach((session) => {
+    listSessions(pattern, options).result.forEach((session) => {
       if(session.user && session.user.name && !skip.includes(session.user.name) && JSON.stringify(session).match(pattern)){
-        if(!ret.results[session.user.name]) {
-          ret.results[session.user.name] = [];
+        if(!ret.result[session.user.name]) {
+          ret.result[session.user.name] = [];
         }
-        ret.results[session.user.name].push(session);
+        ret.result[session.user.name].push(session);
       }
     });
   } catch (error) {
@@ -331,13 +331,13 @@ usage.getCollections =
   Parameters:
     nsPattern - regex/string to limit databases/collections returned
   Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, cols: [ <col>, ... ] } ] }`;
+    { ok: ..., err: <error>, result: [ { db: <db>, cols: [ <col>, ... ] } ] }`;
 
 function getCollections(nsPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getDatabases().results.forEach(function(database) {
+    getDatabases().result.forEach(function(database) {
       var dbObj = { "db": database, "cols": [] }
       getDatabase(database).getCollectionNames().forEach(function(collection) {
         var ns = database + '.' + collection;
@@ -346,7 +346,7 @@ function getCollections(nsPattern) {
         }
       });
       if (dbObj.cols.length > 0) {
-        ret.results.push(dbObj);
+        ret.result.push(dbObj);
       }
     });
   } catch (error) {
@@ -365,14 +365,14 @@ usage.getEstimatedDocumentCounts =
   Parameters:
     nsPattern - regex/string to limit databases/collections returned
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db.coll>, count: <count> }, ... ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db.coll>, count: <count> }, ... ] }`;
 
 function getEstimatedDocumentCounts(nsPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getNameSpaces(nsPattern).results.forEach(function(namespace) {
-      ret.results.push({ "ns": namespace, "count": getCollection(namespace).estimatedDocumentCount() });
+    getNameSpaces(nsPattern).result.forEach(function(namespace) {
+      ret.result.push({ "ns": namespace, "count": getCollection(namespace).estimatedDocumentCount() });
     }); 
   } catch (error) {
     ret.ok = 0;
@@ -391,21 +391,21 @@ usage.getAtlasSearchDocCount =
   Parameters:
     nsPattern - regex/string to limit databases/collections returned
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db.coll>, count: <count> }, ... ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db.coll>, count: <count> }, ... ] }`;
 
 function getAtlasSearchDocCount(nsPattern) {
   var ret = { ok: 1 }
-  ret.results = {};
+  ret.result = {};
   try {
-    getNameSpaces(nsPattern).results.forEach(function(namespace) {
+    getNameSpaces(nsPattern).result.forEach(function(namespace) {
       var stats = getCollection(namespace).stats();
-      ret.results[namespace] = [];
+      ret.result[namespace] = [];
       if (isShardedCluster() == true ){
         Object.keys(stats.shards).forEach(function (sh) {
-          ret.results[namespace].push({shard: sh, count: stats.shards[sh].count, percent: (stats.shards[sh].count/ maxAtlasSearchDocuments) * 100});
+          ret.result[namespace].push({shard: sh, count: stats.shards[sh].count, percent: (stats.shards[sh].count/ maxAtlasSearchDocuments) * 100});
         });
       } else {
-        ret.results[namespace].push({count: stats.count, percent: (stats.count/ maxAtlasSearchDocuments) * 100});
+        ret.result[namespace].push({count: stats.count, percent: (stats.count/ maxAtlasSearchDocuments) * 100});
       }
     });
   } catch (error) {
@@ -424,14 +424,14 @@ usage.getAvgObjSize =
   Parameters:
     nsPattern - regex/string to limit databases/collections returned
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db.coll>, avgObjSize: <bytes> }, ... ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db.coll>, avgObjSize: <bytes> }, ... ] }`;
 
 function getAvgObjSize(nsPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getNameSpaces(nsPattern).results.forEach(function(namespace) {
-      ret.results.push({ "ns": namespace, "avgObjSize": getCollection(namespace).stats().avgObjSize });
+    getNameSpaces(nsPattern).result.forEach(function(namespace) {
+      ret.result.push({ "ns": namespace, "avgObjSize": getCollection(namespace).stats().avgObjSize });
     }); 
   } catch (error) {
     ret.ok = 0;
@@ -451,17 +451,17 @@ usage.getCurrentOps =
     nsPattern - regex/string to limit namespaces
     idxPattern - regex/string to limit indexes
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 // Not too keen on how this one worked out. currentOp: true has to be the first element in associative array.
 
 function getCurrentOps(pattern, options = { currentOp: true, "$all": true }) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
     dbAdminCommand(options).inprog.forEach(function(op) {
       if (JSON.stringify(op).match(pattern)) {
-        ret.results.push(op);
+        ret.result.push(op);
       }
     });  
   } catch (error) {
@@ -516,15 +516,15 @@ usage.getCurrentOpsWaitingForLock =
     nsPattern - regex/string to limit namespaces
     idxPattern - regex/string to limit indexes
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 //function getCurrentOpsWaitingForLock(pattern, options = { "waitingForLock": true, $or: [ { "op" : { "$in" : [ "insert", "update", "remove" ] } }, { "command.findandmodify": { $exists: true } } ] }) {
 //  var ret = { ok: 1 }
-//  ret.results = [];
+//  ret.result = [];
 //  options = { currentOp: true };
 //  try {
 //    getCurrentOps(pattern, options);
-//    ret.results =  dbAdminCommand(options).inprog.forEach(function(op).results;
+//    ret.result =  dbAdminCommand(options).inprog.forEach(function(op).result;
 //  } catch (error) {
 //    ret.ok = 0;
 //    ret.err = error;
@@ -542,15 +542,15 @@ usage.getDatabases =
   Parameters:
     dbPattern - regex/string to limit databases returned
   Returns:
-    { ok: ..., err: <error>, results: [<db>, ...] }`;
+    { ok: ..., err: <error>, result: [<db>, ...] }`;
 
 function getDatabases(dbPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
     db.getMongo().getDBNames().forEach(function(database) {
       if (database != 'admin' && database != 'local' && database != 'config' && dbPattern !== null && database.match(dbPattern)) {
-        ret.results.push(database);
+        ret.result.push(database);
       }
     });
   } catch (error) {
@@ -571,13 +571,13 @@ usage.getIndexes =
     nsPattern - regex/string to limit namespaces
     idxPattern - regex/string to limit indexes
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 function getIndexes(nsPattern, idxPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getNameSpaces(nsPattern).results.forEach(function(ns) {
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
       getCollection(ns).getIndexes().forEach(function(idx) {
         if (JSON.stringify(idx).match(idxPattern)) {
@@ -585,7 +585,7 @@ function getIndexes(nsPattern, idxPattern) {
         }
       });  
       if(dbObj.indexes.length > 0) {
-        ret.results.push(dbObj);
+        ret.result.push(dbObj);
       }
     }); 
   } catch (error) {
@@ -606,14 +606,14 @@ usage.getIndexStats =
     nsPattern - regex/string to limit namespaces
     idxPattern - regex/string to limit indexes
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 
 function getIndexStats(nsPattern, idxPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getNameSpaces(nsPattern).results.forEach(function(ns) {
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
       var col = getCollection(ns);
       stats = col.stats();                                        // May want to write getStats()
@@ -629,7 +629,7 @@ function getIndexStats(nsPattern, idxPattern) {
         }
       });  
       if(dbObj.indexes.length > 0) {
-        ret.results.push(dbObj);
+        ret.result.push(dbObj);
       }
     }); 
   } catch (error) {
@@ -648,13 +648,13 @@ usage.getUnusedIndexes =
   Parameters:
     nsPattern - regex/string to limit namespaces
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
 
 function getUnusedIndexes(nsPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getNameSpaces(nsPattern).results.forEach(function(ns) {
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
       var dbObj = { "ns": ns, "indexes": [] }
       getCollection(ns).aggregate([{$indexStats:{}}]).forEach(function(idx) {
         if (JSON.stringify(idx).match(/"accesses":{"ops":{"low":0,"high":0,"unsigned":false}/)) {
@@ -662,7 +662,7 @@ function getUnusedIndexes(nsPattern) {
         }
       });  
       if(dbObj.indexes.length > 0) {
-        ret.results.push(dbObj);
+        ret.result.push(dbObj);
       }
     }); 
   } catch (error) {
@@ -681,17 +681,17 @@ usage.getNameSpaces =
   Parameters:
     nsPattern - regex/string to limit databases returned
   Returns:
-    { ok: ..., err: <error>, results: [ <ns>, ... ] }`;
+    { ok: ..., err: <error>, result: [ <ns>, ... ] }`;
 
 function getNameSpaces(nsPattern) {
   var ret = { ok: 1 }
-  ret.results = [];
+  ret.result = [];
   try {
-    getDatabases().results.forEach(function(database) {
+    getDatabases().result.forEach(function(database) {
       getDatabase(database).getCollectionNames().forEach(function(collection) {
         var ns = database + '.' + collection;
         if ( nsPattern == null || ns.match(nsPattern) ) {
-          ret.results.push(database + '.' + collection)
+          ret.result.push(database + '.' + collection)
         }
       })
     });
@@ -711,16 +711,16 @@ usage.getProfilingStatuses =
   Parameters:
     nsPattern - regex/string to limit databases
   Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
+    { ok: ..., err: <error>, result: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
 
 function getProfilingStatuses(nsPattern) {
   var ret = { ok: 1 };
-  ret.results = [];
+  ret.result = [];
   try {
-    getDatabases(nsPattern).results.forEach(function(database) {
+    getDatabases(nsPattern).result.forEach(function(database) {
       var dbObj = { "db": database };
       dbObj.profilingStatus = getDatabase(database).getProfilingStatus();
-      ret.results.push(dbObj);
+      ret.result.push(dbObj);
     }); 
   } catch (error) {
     ret.ok = 0;
@@ -741,15 +741,15 @@ usage.setProfilingLevels =
     options - integer - sets slowms
               document - passes options through to setProfilingLevel()
   Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
+    { ok: ..., err: <error>, result: [ { db: <db>, profilingStatus: <profilingStatus> } ] }`;
 
 function setProfilingLevels(nsPattern, level = 0, options = { slowms: 100 }) {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
-    getDatabases(nsPattern).results.forEach(function(database) {
+    getDatabases(nsPattern).result.forEach(function(database) {
       var dbObj = { "db": database } 
       dbObj.profilingStatus = getDatabase(database).setProfilingLevel(level, options);
-      ret.results.push(dbObj);
+      ret.result.push(dbObj);
     });
   } catch (error) {
     ret.ok = 0;
@@ -767,16 +767,16 @@ usage.dbFind =
   Parameters:
     nsPattern - regex/string to limit namespaces
     query     - (optional) query to run against each namespace
-    proj      - (optional) projection of the results
-    sort      - (optional) sort the results for each query
+    proj      - (optional) projection of the result
+    sort      - (optional) sort the result for each query
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <ns>, results: [<query-results>] ] }`;
+    { ok: ..., err: <error>, result: [ { ns: <ns>, result: [<query-result>] ] }`;
 
 function dbFind(nsPattern, query = {}, proj = {}, sort = {}) {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
-    getNameSpaces(nsPattern).results.forEach(function(ns) {
-      ret.results.push({ "ns": ns, results: getCollection(ns).find(query, proj).sort(sort).toArray() });
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
+      ret.result.push({ "ns": ns, result: getCollection(ns).find(query, proj).sort(sort).toArray() });
     });
   } catch (error) {
     ret.ok = 0;
@@ -812,11 +812,11 @@ usage.getCreateIndexCommands =
     nsPattern - regex/string to limit to specific namespaces
     idxPattern - regex/string to limit to specific indexes or types of indexes
   Returns:
-    { ok: ..., err: <error>, results: [ { ns: <namespace>, commands: [ <create-index-command>, ...]  } ], string: <create-index-commands> }`;
+    { ok: ..., err: <error>, result: [ { ns: <namespace>, commands: [ <create-index-command>, ...]  } ], string: <create-index-commands> }`;
 
 function getCreateIndexCommands(nsPattern, idxPattern) {
-  var ret = { ok: 1, results: [], string: '' };
-  getIndexes(nsPattern, idxPattern).results.forEach(function(namespace) {
+  var ret = { ok: 1, result: [], string: '' };
+  getIndexes(nsPattern, idxPattern).result.forEach(function(namespace) {
     var result = { ns: namespace.ns, commands: [] };
     var ns = splitNameSpace(namespace.ns)
     namespace.indexes.forEach(function(index) {
@@ -830,7 +830,7 @@ function getCreateIndexCommands(nsPattern, idxPattern) {
       }
     });
     if(result.commands.length > 0){
-      ret.results.push(result);
+      ret.result.push(result);
     }
   });
   return ret;
@@ -846,18 +846,18 @@ usage.setBalancing =
     nsPattern - regex/string to limit databases returned
     enable - boolean - true/false
   Returns:
-    { ok: ..., err: <error>, results: [ { db: <db>, results: <enable/disable-result> } ] }`;
+    { ok: ..., err: <error>, result: [ { db: <db>, result: <enable/disable-result> } ] }`;
 
 function setBalancing(nsPattern, enable) {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
-    getNameSpaces(nsPattern).results.forEach(function(ns) {
+    getNameSpaces(nsPattern).result.forEach(function(ns) {
       stats = getCollection(ns).stats()
       if (stats.hasOwnProperty('shards') ) {
         if(enable === true) {
-          ret.results.push(sh.enableBalancing(ns));
+          ret.result.push(sh.enableBalancing(ns));
         } else {
-          ret.results.push(sh.disableBalancing(ns));
+          ret.result.push(sh.disableBalancing(ns));
         }
       }
     });
@@ -878,31 +878,32 @@ usage.getLog =
     logPattern - regex/string used to match the log entry
     options.type - type will be pass into getLog command; Default: 'global';
   Returns:
-    { ok: ..., err: <error>, results: [ <log-entry>, ... ] }`;
+    { ok: ..., err: <error>, result: [ <log-entry>, ... ] }`;
 
-function getLog (logPattern, options = { type: 'global' } ) {
-  var ret = { ok: 1 };
+function getLog (logPattern, options = { type: 'global', next: false } ) {
+  var ret = { ok: 1, result: [] };
   try {
-    var sessions = listSessionsBySessionId().results;
-    var log = getDatabase('admin').adminCommand({ getLog: options.type });
-    if("log" in log) {
-      var logs = log.log;
-      log.log = [];
-      var item = {};
-      logs.forEach(function (entry) {
-        item = JSON.parse(entry);
-        if(item.attr && item.attr.command && item.attr.command.lsid && item.attr.command.lsid.id && item.attr.command.lsid.id['$uuid']) {
-          if(sessions[item.attr.command.lsid.id['$uuid']]) {
-            // If we can match the session ID to the user then add the user in
-            item.attr.user = sessions[item.attr.command.lsid.id['$uuid']].user;
+    var sessions = listSessionsBySessionId().result;
+    var objLog;
+    dynamic.getLog ||= {};
+    var log = getDatabase('admin').adminCommand({ getLog: ( options.type || 'global' ) }).log;
+    log.forEach( function( entry, idx ) {
+      if(options.next == false || (entry > (dynamic.getLog.lastEntry ||= ''))) {
+        if(entry.match(logPattern)) {
+          objLog = JSON.parse(entry);
+          if(objLog.attr && objLog.attr.command && objLog.attr.command.lsid && objLog.attr.command.lsid.id && objLog.attr.command.lsid.id['$uuid']) {
+            if(sessions[objLog.attr.command.lsid.id['$uuid']]) {
+              // If we can match the session ID to the user then add the user in
+              objLog.attr.user = sessions[objLog.attr.command.lsid.id['$uuid']].user;
+            }
+          }
+          ret.result.push(objLog);
+          if(log.length - 1 == idx) {
+            dynamic.getLog.lastEntry = entry;
           }
         }
-        if (JSON.stringify(item).match(logPattern)) {
-          log.log.push(item);
-        }
-      });
-    }
-    ret.results = log;
+      }
+    });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -915,8 +916,34 @@ function getLog (logPattern, options = { type: 'global' } ) {
 // ToDo:
 // - add a save to file option
 
-usage.tailLog =
-`tailLog(logPattern, options)
+usage.nextLog =
+`nextLog(logPattern, options)
+  Description:
+    Gets the next set of logs.
+  Parameters:
+    logPattern - regex/string used to match the log entry
+    options.sRunTime - Seconds to run before exiting; omit to run continuously
+    options.showRate - Show the rate of the log entries.
+    options.file - file to write to
+  Prints:
+    <log-entry>
+    ...`;
+
+function nextLog(logPattern, options = {next: true}) {
+  var ret = { ok: 1, result: [] };
+  try {
+    ret.result = getLog(logPattern, options).result;
+  } catch (error) {
+    ret.ok = 0;
+    ret.err = error;
+  }
+  return ret; 
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.watchLog =
+`watchLog(logPattern, options)
   Description:
     Tails the internal log for sRunTime seconds looking for logPattern
   Parameters:
@@ -928,64 +955,36 @@ usage.tailLog =
     <log-entry>
     ...`;
 
-function tailLog(logPattern, options = {}) {
-  var sRunTime = options.sRunTime;
-  var showRate = options.showRate;
-  var logs = [];
-  var rateCounter = 0;
-  var lastTime = 0;
-  var printTime = 0;
-
-  var int = 1000;
-
-  var msRunTime = sRunTime * 1000;
-  var dups = 0;
+function watchLog(logPattern, options = {}) {
+  options.next = true;
 
   var rate = {
-    startTime: 0,
+    startTime: ISODate(),
     duration: 0,
     count: 0
   };
-  isoStartTime = ISODate();
 
-  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-    logs = getLog(logPattern).results.log;
-    dups = 0;
-    logs.forEach(function(val, idx) {
-      printTime = ISODate(val.t.$date).getTime();
-      if(printTime > lastTime) {
-        if(rate.startTime == 0) { isoStartTime.setTime(rate.startTime = printTime); }
-        rate.count += 1;
-        print(val);
-        if(options.file != undefined) {
-          fs.appendFile(options.file, JSON.stringify(val) + "\n", err => {
-            if (err) throw err;
-          });
-        }
-      } else {
-        dups++;
+  while(1) {
+    log = getLog(logPattern, options).result;
+    log.forEach(function(entry, idx) {
+      print(entry);
+      if(options.file != undefined) {
+        fs.appendFile(options.file, JSON.stringify(entry) + "\n", err => {
+          if (err) throw err;
+        });
       }
     });
 
-    if(showRate) {
+    if(options.showRate) {
       rate.duration = (ISODate().getTime() - rate.startTime)/1000; // seconds
+      rate.count += log.length;
       print ("startTime: " + isoStartTime);
       print ("count: " + rate.count);
       print ("duration (s): " + rate.duration);
       print ("rate: " + (rate.count / rate.duration).toFixed(3) + "/s"); 
     }
 
-    if(logs.length < 1024) {
-      int = 1000;
-    } else {
-      int = dups;
-    }
-
-    sleep(int);
-    if (sRunTime !== undefined && sRunTime !== null) {
-      msRunTime -= int;
-    }
-    lastTime = printTime;
+    sleep(1023 - log.length);
   }
 }
 
@@ -1030,7 +1029,7 @@ usage.slowQueries =
   Description:
     Displays a list of slow queries given a logPattern. 
   Parameters:
-    query - query
+    logPattern - query
     options.sRunTime - length of time to run the operation
   Prints (example):
     tTotal | tAvg | tMax | tMin | Count |                  ns |   op | Plan     | Query Shape
@@ -1077,7 +1076,7 @@ function slowQueries(logPattern, options = {}) {
 
 
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-    logs = getLog(logPattern).results.log;
+    logs = getLog(logPattern).result.log;
     dups = 0;
     logs.forEach(function(val) {
       printTime = ISODate(val.t.$date).getTime();
@@ -1241,7 +1240,7 @@ function watchEstimatedDocumentCounts(nsPattern, sRunTime, msPollTime = 1000) {
   var counts = [];
 
   while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-    var latestCounts = getEstimatedDocumentCounts(nsPattern).results;
+    var latestCounts = getEstimatedDocumentCounts(nsPattern).result;
 
     latestCounts.forEach(function (item, idx) {
       if (counts[idx] === undefined) {
@@ -1282,7 +1281,7 @@ usage.changeStream =
     eventHandler - A function which will be pass the event; Default: function which prints the event`;
 
 function changeStream(ns, pipeline = [], options = {}, eventHandler = function(event){print(JSON.stringify(event,null,2)); }) {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
     const collection = getCollection(ns);
     var cursor = collection.watch(pipeline, options);
@@ -1317,7 +1316,7 @@ usage.findArchivedDocument =
 csArchive = function(event){db.csArchive.insertOne(event)};
 
 function findArchivedDocument(nsArchive, query, sortDocument = { clusterTime: 1} ) {
-  var ret = { ok: 1 , results: null};
+  var ret = { ok: 1 , result: null};
   try {
     var fullDocument = null;
     var archive = getCollection(nsArchive);
@@ -1335,7 +1334,7 @@ function findArchivedDocument(nsArchive, query, sortDocument = { clusterTime: 1}
         fullDocument = null;
       }
     }
-    ret.results = fullDocument;
+    ret.result = fullDocument;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1370,7 +1369,7 @@ usage.getWiredTigerCacheSize =
 function getWiredTigerCacheSize(div = 1) {
   var ret = { ok: 1 };
   try {
-    ret.results = (static.wiredTigerCacheSize ||= db.serverStatus().wiredTiger.cache["maximum bytes configured"]) / div;
+    ret.result = (static.wiredTigerCacheSize ||= db.serverStatus().wiredTiger.cache["maximum bytes configured"]) / div;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1389,36 +1388,36 @@ usage.getWiredTigerCacheStats =
     options.div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
 
 function getWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
 
   try {
-    ret.results.totalSize = getWiredTigerCacheSize(options.div).results;
-    ret.results.allocated = 0;
-    ret.results.free = ret.results.totalSize;
-    ret.results.allocatedPercent = 0;
-    ret.results.freePercent = 0;
-    ret.results.inCache = [];
-    getNameSpaces(ns).results.forEach(function (ns) {
+    ret.result.totalSize = getWiredTigerCacheSize(options.div).result;
+    ret.result.allocated = 0;
+    ret.result.free = ret.result.totalSize;
+    ret.result.allocatedPercent = 0;
+    ret.result.freePercent = 0;
+    ret.result.inCache = [];
+    getNameSpaces(ns).result.forEach(function (ns) {
       var current = {};
       var colStats = getCollection(ns).stats({ indexDetails: true });
       current.ns = ns;
       current.docs = colStats.wiredTiger.cache["bytes currently in the cache"] / options.div;
       current.indexes = colStats.indexDetails._id_.cache["bytes currently in the cache"] / options.div;
-      current.docsPercent = current.docs / ret.results.totalSize * 100;
-      current.indexesPercent = current.indexes / ret.results.totalSize * 100;
-      ret.results.allocated += current.docs + current.indexes;
-      ret.results.free -= current.docs + current.indexes;
-      ret.results.inCache.push(current);
+      current.docsPercent = current.docs / ret.result.totalSize * 100;
+      current.indexesPercent = current.indexes / ret.result.totalSize * 100;
+      ret.result.allocated += current.docs + current.indexes;
+      ret.result.free -= current.docs + current.indexes;
+      ret.result.inCache.push(current);
     });
-    ret.results.allocatedPercent = ret.results.allocated / ret.results.totalSize * 100;
-    ret.results.freePercent = ret.results.free / ret.results.totalSize * 100;
+    ret.result.allocatedPercent = ret.result.allocated / ret.result.totalSize * 100;
+    ret.result.freePercent = ret.result.free / ret.result.totalSize * 100;
     if(options.fixed != null) {
-      ret.results.totalSize = ret.results.totalSize.toFixed(options.fixed);
-      ret.results.allocated = ret.results.allocated.toFixed(options.fixed);
-      ret.results.allocatedPercent = ret.results.allocatedPercent.toFixed(options.fixed);
-      ret.results.free = ret.results.free.toFixed(options.fixed);
-      ret.results.freePercent = ret.results.freePercent.toFixed(options.fixed);
-      ret.results.inCache.forEach( item => {
+      ret.result.totalSize = ret.result.totalSize.toFixed(options.fixed);
+      ret.result.allocated = ret.result.allocated.toFixed(options.fixed);
+      ret.result.allocatedPercent = ret.result.allocatedPercent.toFixed(options.fixed);
+      ret.result.free = ret.result.free.toFixed(options.fixed);
+      ret.result.freePercent = ret.result.freePercent.toFixed(options.fixed);
+      ret.result.inCache.forEach( item => {
         item.docs = item.docs.toFixed(options.fixed);
         item.indexes = item.indexes.toFixed(options.fixed);
         item.docsPercent = item.docsPercent.toFixed(options.fixed);
@@ -1443,7 +1442,7 @@ usage.watchWiredTigerCacheStats =
     options.div - Divisor - pass 1024 for KB; 1024*1024 for MB; 1024*1024*1024 for GB;`;
 
 function watchWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
 
   var sRunTime = options.sRunTime;
   var msRunTime = sRunTime * 1000;
@@ -1483,12 +1482,12 @@ function watchWiredTigerCacheStats(ns, options = { div: 1, fixed: null }) {
   try {
     while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
       wtcStats = getWiredTigerCacheStats(ns,options);
-      table.data = wtcStats.results.inCache;
+      table.data = wtcStats.result.inCache;
       print("\n");
       print("WIRED TIGER CACHE CONTENTS");
-      print("Total Size: " + wtcStats.results.totalSize);
-      print("Allocated: " + wtcStats.results.allocated);
-      print("Free: " + wtcStats.results.free);
+      print("Total Size: " + wtcStats.result.totalSize);
+      print("Allocated: " + wtcStats.result.allocated);
+      print("Free: " + wtcStats.result.free);
       printTable(table);
       print("\n");
       sleep(1);
@@ -1588,18 +1587,18 @@ usage.getSizingInfo =
     pattern - pattern that namespace much match`;
 
 function getSizingInfo(pattern) {
-  var ret = { ok: 1, results: {}, string: "" };
+  var ret = { ok: 1, result: {}, string: "" };
   var ns;
   try {
-    getCollections(pattern).results.forEach(function(dbObj) {
-      if(!(dbObj.db in ret.results)) {
-        ret.results[dbObj.db] = {}; 
+    getCollections(pattern).result.forEach(function(dbObj) {
+      if(!(dbObj.db in ret.result)) {
+        ret.result[dbObj.db] = {}; 
       }
       dbObj.cols.forEach(function(col) {
       ns = dbObj.db + '.' + col;
         var stats = getCollection(ns).stats();
         var blockManager = stats.wiredTiger['block-manager'];
-        ret.results[dbObj.db][col] = {
+        ret.result[dbObj.db][col] = {
           avgIndexSize: stats.totalIndexSize/stats.count,
           avgObjSize: stats.avgObjSize,
           count: stats.count,
@@ -1630,7 +1629,7 @@ usage.getStartupWarnings =
 function getStartupWarnings () {
   var ret = { ok: 1 };
   try {
-    ret.results = getDatabase('admin').adminCommand({ getLog: 'startupWarnings' });
+    ret.result = getDatabase('admin').adminCommand({ getLog: 'startupWarnings' });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1648,7 +1647,7 @@ usage.getBuildInfo =
 function getBuildInfo() {
   var ret = { ok: 1 };
   try {
-    ret.results = getDatabase('admin').runCommand({ buildInfo: 1});
+    ret.result = getDatabase('admin').runCommand({ buildInfo: 1});
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1666,7 +1665,7 @@ usage.getConnections =
 function getConnections() {
   var ret = { ok: 1 };
   try {
-    ret.results = db.currentOp(true).inprog.reduce(
+    ret.result = db.currentOp(true).inprog.reduce(
       (accumulator, connection) => {
         let ipaddress = connection.client ? connection.client.split(":")[0] : "Internal";
         if (accumulator[ipaddress]) {
@@ -1693,14 +1692,14 @@ usage.getShardedClusterHosts =
     Gets list of hosts for the replica set.`
 
 function getShardedClusterHosts() {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
   try {
-    ret.results = [];
+    ret.result = [];
     var hosts = '';
     getDatabase('config').shards.find().toArray().forEach( shard => {
       hosts = shard.host;
       hosts = hosts.slice(hosts.search('/')+1)
-      ret.results[shard._id] = hosts.split(',');
+      ret.result[shard._id] = hosts.split(',');
 
     });
   } catch (error) {
@@ -1720,8 +1719,8 @@ usage.getReplicaSetHosts =
 function getReplicaSetHosts() {
   var ret = { ok: 1 };
   try {
-    ret.results = [];
-    rs.config().members.forEach( member => { ret.results.push(member.host) });
+    ret.result = [];
+    rs.config().members.forEach( member => { ret.result.push(member.host) });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1745,7 +1744,7 @@ function buildConnectionString(hostname) {
   var ret = { ok: 1 };
   try {
     static.user ||= db.runCommand({connectionStatus: 1}).authInfo.authenticatedUsers[0].user;
-    ret.results = `mongodb://${static.user}:${static.password}@${hostname}/?tls=true`;
+    ret.result = `mongodb://${static.user}:${static.password}@${hostname}/?tls=true`;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1761,7 +1760,7 @@ usage.connectHosts =
     Connects to each host; Run login() first.`
 
 function connectHosts() {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
     if(static.password == undefined) {
       login();
@@ -1769,11 +1768,11 @@ function connectHosts() {
 
     if(static.nodes == undefined) {
       if(isShardedCluster() == true) {
-        var shHosts = getShardedClusterHosts().results;
+        var shHosts = getShardedClusterHosts().result;
         Object.keys(shHosts).forEach( shard => {
           shHosts[shard].forEach(host => {
             static["nodes"] ||= {};
-            static["nodes"][host] = connect(buildConnectionString(host).results);
+            static["nodes"][host] = connect(buildConnectionString(host).result);
           });
         });
       } else if (isReplicaSet() == true) {
@@ -1784,12 +1783,12 @@ function connectHosts() {
             "stateStr": member.stateStr
           }
         });
-        getReplicaSetHosts().results.forEach( host => { 
+        getReplicaSetHosts().result.forEach( host => { 
           static["nodes"] ||= {};
-          static["nodes"][host] = connect(buildConnectionString(host).results);
+          static["nodes"][host] = connect(buildConnectionString(host).result);
         });
       }
-      ret.results = static["nodes"];
+      ret.result = static["nodes"];
     }
   } catch (error) {
     ret.ok = 0;
@@ -1806,7 +1805,7 @@ usage.reConnectHosts =
     re-connects to each host`
 
 function reConnectHosts() {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
     delete static['nodes'];
     ret = connectHosts();
@@ -1826,19 +1825,19 @@ usage.connectShards =
     Connects to each shard; Run login() first.`
 
 function connectShards() {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
     if(isShardedCluster() == true) {
-      var shHosts = getShardedClusterHosts().results;
+      var shHosts = getShardedClusterHosts().result;
       var hosts = '';
       static["shards"] ||= {};
       Object.keys(shHosts).forEach( shard => {
         hosts = shHosts[shard].join(',');
-        strConn = buildConnectionString(hosts).results;
-        static["shards"][shard] = connect(buildConnectionString(hosts).results);
+        strConn = buildConnectionString(hosts).result;
+        static["shards"][shard] = connect(buildConnectionString(hosts).result);
       });
     }
-    ret.results = static["shards"];
+    ret.result = static["shards"];
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1854,9 +1853,9 @@ usage.useStart =
     Switches to the original connection.`
 
 function useStart() {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
   try {
-    ret.results['db'] = db = dbStart;
+    ret.result['db'] = db = dbStart;
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1872,15 +1871,15 @@ usage.usePrimary =
     Switches connection to the primary node.`
 
 function usePrimary() {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
   try {
     if(static.nodes == undefined) {
       connectHosts();
     }
     rs.status().members.forEach( member => {
       if(member.stateStr == 'PRIMARY') {
-        ret.results['host'] = member.name;
-        ret.results['db'] = db = static.nodes[member.name];
+        ret.result['host'] = member.name;
+        ret.result['db'] = db = static.nodes[member.name];
       }
     });
   } catch (error) {
@@ -1898,7 +1897,7 @@ usage.nextSecondary =
     Switches connection to the next secondary node.`
 
 function nextSecondary() {
-  var ret = { ok: 1, results: {} };
+  var ret = { ok: 1, result: {} };
   try {
 
     if(static.nodes == undefined) {
@@ -1925,8 +1924,8 @@ function nextSecondary() {
         }
       }
     });
-    ret.results['host'] = nextSecondary ||= firstSecondary;
-    ret.results['db'] = db = static.nodes[nextSecondary];
+    ret.result['host'] = nextSecondary ||= firstSecondary;
+    ret.result['db'] = db = static.nodes[nextSecondary];
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1945,7 +1944,7 @@ function nextSecondary() {
 function getCollStats(nsPattern) {
   var ret = { ok: 1 };
   try {
-//    ret.results = getDatabase('admin').runCommand({ buildInfo: 1});
+//    ret.result = getDatabase('admin').runCommand({ buildInfo: 1});
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1955,9 +1954,9 @@ function getCollStats(nsPattern) {
 
 // FIXIT: Catch sharded cluster!
 function getConnPoolStats() {
-  var ret = { ok: 1, results: [] };
+  var ret = { ok: 1, result: [] };
   try {
-    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 }); // BSB FIX THIS!
+    ret.result = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 }); // BSB FIX THIS!
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1968,7 +1967,7 @@ function getConnPoolStats() {
 function getHostInfo () {
   var ret = { ok: 1 };
   try {
-    ret.results = getDatabase('admin').adminCommand({ hostInfo: 1});
+    ret.result = getDatabase('admin').adminCommand({ hostInfo: 1});
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1979,7 +1978,7 @@ function getHostInfo () {
 function getCmdLineOpts () {
   var ret = { ok: 1 };
   try {
-    ret.results = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
+    ret.result = getDatabase('admin').adminCommand({ getCmdLineOpts: 1 });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -1993,17 +1992,17 @@ function isStandAlone() {
 }
 
 function isReplicaSet() {
-  return getCmdLineOpts().results.parsed['replication'] != undefined;
+  return getCmdLineOpts().result.parsed['replication'] != undefined;
 }
 
 function isShardedCluster() {
-  return getCmdLineOpts().results.parsed['sharding'] != undefined;
+  return getCmdLineOpts().result.parsed['sharding'] != undefined;
 }
 
 function getBuildInfo() {
   var ret = { ok: 1 };
   try {
-    ret.results = getDatabase('admin').runCommand({ buildInfo: 1 });
+    ret.result = getDatabase('admin').runCommand({ buildInfo: 1 });
   } catch (error) {
     ret.ok = 0;
     ret.err = error;
@@ -2037,16 +2036,16 @@ function deleteKey(obj, path) {
 }
 
 function getStableAPIStatus() {
-  var ret = { ok: 1, results: {} }
+  var ret = { ok: 1, result: {} }
   
   var apiStatus = db.serverStatus().metrics.apiVersions;
  
   Object.keys(apiStatus).forEach(function (app) {
     apiStatus[app].forEach(function (ver) {
-      if (! (ver in ret.results)){
-        ret.results[ver] = [];
+      if (! (ver in ret.result)){
+        ret.result[ver] = [];
       }
-      ret.results[ver].push(app);
+      ret.result[ver].push(app);
     });
   });
   return ret;
