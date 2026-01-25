@@ -990,6 +990,182 @@ function watchLog(logPattern, options = {}) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.slowQueries =
+`slowQueries(logPattern, options)
+  Description:
+    Displays a list of slow queries given a logPattern. 
+  Parameters:
+    logPattern - query
+    options.sRunTime - length of time to run the operation
+  Prints (example):
+    tTotal | tAvg | tMax | tMin | Count |                  ns |   op | Plan     | Query Shape
+    -------------------------------------------------------------------------------------------------------
+        25 |   25 |   25 |   25 |     1 | sample_mflix.movies | find | COLLSCAN | {"directors":"string"}`;
+
+function slowQueries(logPattern, options = {}) {
+  options.next = true;
+
+  var slowQueries = {};
+  var slowQuery = {};
+  var qIdx = '';
+  var ns = '';
+  var query = '';
+  var sort = '';
+  var op = '';
+  var planSummary = '';
+  var index = '';
+  var durationMillis = 0;
+
+  var colWidth = {
+    tTotal: 'tTotal'.length,
+    tAvg: 'tAvg'.length,
+    tMax: 'tMax'.length,
+    tMin: 'tMin'.length,
+    count: 'count'.length,
+    ns: 'ns'.length,
+    op: 'op'.length,
+    planSummary: 'planSummary'.length,
+    index: 'index'.length,
+    query: 'query'.length,
+    sort: 'sort'.length
+  };
+
+  var table = {};
+  table.headings = [
+    { name: 'tTotal', justify: 'R' },
+    { name: 'tAvg', justify: 'R' },
+    { name: 'tMax', justify: 'R' },
+    { name: 'tMin', justify: 'R' },
+    { name: 'count', justify: 'R' },
+    { name: 'ns', justify: 'R' },
+    { name: 'op', justify: 'R' },
+    { name: 'planSummary', justify: 'R' },
+    { name: 'index', justify: 'R' },
+    { name: 'query', justify: 'L' },
+    { name: 'sort', justify: 'L' },
+  ];
+
+  while(1) {
+    log = getLog(logPattern, options).result;
+    log.forEach(function(entry, idx) {
+      index = planSummary = op = qIdx = sort = '';
+      // only get slow queries: 51803
+      // filter out system dbs
+      // 
+      if(entry.id == 51803
+        && entry.c == 'COMMAND'
+        && (! /^(admin|config|local)\./.test(entry.attr.ns) )
+        && entry.attr && entry.attr.command
+        && !('profile' in  entry.attr.command)
+        && !('pipeline' in entry.attr.command && ('$collStats' in entry.attr.command.pipeline[0]))
+        && !('dbstats' in entry.attr.command)
+        && !('dropIndexes' in entry.attr.command)
+        && !('createIndexes' in entry.attr.command)
+        ) {
+//      print("entry:" + JSON.stringify(entry, null, 2));
+
+        // get query shape and sort shape:
+        if( 'find' in  entry.attr.command){
+          op = 'find';
+          query = JSON.stringify(entry.attr.command.filter);
+          if('sort' in entry.attr.command) {
+            sort = JSON.stringify(entry.attr.command.sort);
+          }
+          ns = entry.attr.ns;
+          qIdx = ns + ":" + op + ':' + query + ":" + sort;
+        } else if ('aggregate' in entry.attr.command ) {
+          op = 'aggregate';
+          query = JSON.stringify(findIndexedMatches(entry.attr.command.pipeline));
+          sort = JSON.stringify(findIndexedSort(entry.attr.command.pipeline));
+          ns = entry.attr.ns;
+          qIdx = ns + ":" + op + ':' + query + ":" + sort;
+        } else if ('update' in entry.attr.command ) {
+          op = 'update';
+          query = JSON.stringify(entry.attr.command.updates[0].q);
+          qIdx = ns + ":" + op + ':' + query;
+          ns = entry.attr.ns.replace('$cmd','') + entry.attr.command.update;
+        } else if ('delete' in entry.attr.command ) {
+          op = 'delete';
+          query = JSON.stringify(entry.attr.command.deletes[0].q);
+          qIdx = ns + ":" + op + ':' + query;
+        }
+
+        // Plan Summary
+        if (/^IXSCAN/.test(entry.attr.planSummary)) {
+          planSummary = 'IXSCAN';
+          index = entry.attr.planSummary.replace('IXSCAN ','');
+        } else {
+          planSummary = entry.attr.planSummary;
+        }
+
+        // Duraation
+        durationMillis = entry.attr.durationMillis;
+
+        // store in slowQueries
+        if(qIdx in slowQueries && slowQueries[qIdx]['planSummary'] != planSummary) {
+          delete slowQueries[qIdx];
+        }
+
+        slowQuery = slowQueries[qIdx] ||= {};
+        slowQuery['json'] = JSON.stringify(entry,null,2);
+        slowQuery['ns'] = ns;
+        slowQuery['op'] = op;
+        slowQuery['query'] = query;
+        slowQuery['sort'] = sort;
+        slowQuery['planSummary'] = planSummary;
+        slowQuery['index'] = index;
+        if ('count' in slowQuery) {
+          slowQuery['count']++;
+        } else {
+          slowQuery['count'] = 1;
+        }
+
+        if('tTotal' in slowQuery) {
+          slowQuery['tTotal'] += durationMillis;
+        } else {
+          slowQuery['tTotal'] = durationMillis;
+        }
+
+        if('tMin' in slowQuery) {
+          slowQuery['tMin']    = Math.min(slowQuery.tMin, durationMillis);
+        } else {
+          slowQuery['tMin']    = durationMillis;
+        }
+
+        if('tMax' in slowQuery){
+          slowQuery['tMax']    = Math.max(slowQuery.tMax, durationMillis);
+        } else {
+          slowQuery['tMax']    = durationMillis;
+        }
+
+        slowQuery['tAvg']  = slowQuery.tTotal / slowQuery.count;
+
+        // Set column widths
+        colWidth.tTime = Math.max(colWidth.tTotal, slowQuery.tTotal.toString().length);
+        colWidth.tAvg = Math.max(colWidth.tAvg, slowQuery.tAvg.toString().length);
+        colWidth.tMax = Math.max(colWidth.tMax, slowQuery.tMax.toString().length);
+        colWidth.tMin = Math.max(colWidth.tMin, slowQuery.tMin.toString().length);
+        colWidth.Count = Math.max(colWidth.count, slowQuery.count.toString().length);
+        colWidth.ns = Math.max(colWidth.ns, ns.length);
+        colWidth.op = Math.max(colWidth.op, op.length);
+        colWidth.planSummary = Math.max(colWidth.planSummary, slowQuery.planSummary.length);
+        colWidth.index = Math.max(colWidth.index, slowQuery.index.length);
+        colWidth.query = Math.max(colWidth.query, slowQuery.query.length);
+        colWidth.sort = Math.max(colWidth.sort, slowQuery.sort.length);
+
+        // sort the queries
+        table.data = Object.values(slowQueries).sort((a,b) => b.tTotal - a.tTotal)
+
+        printTable(table);
+        print("\n\n");
+      }
+    });
+    sleep(1023 - log.length);
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 usage.queryShape =
 `queryShape(query)
   Description:
@@ -1024,189 +1200,57 @@ function queryShape(query) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-usage.slowQueries =
-`slowQueries(logPattern, options)
+usage.findIndexedMatches =
+`findIndexedMatch(pipeline)
   Description:
-    Displays a list of slow queries given a logPattern. 
+    Given a pipline, find the $match stages that'll use an index
   Parameters:
-    logPattern - query
-    options.sRunTime - length of time to run the operation
-  Prints (example):
-    tTotal | tAvg | tMax | tMin | Count |                  ns |   op | Plan     | Query Shape
-    -------------------------------------------------------------------------------------------------------
-        25 |   25 |   25 |   25 |     1 | sample_mflix.movies | find | COLLSCAN | {"directors":"string"}`;
+    pipeline - aggregation pipeline
+  Returns (example):
+    { a: <number>, b: <number>, c: { '$in': <array> } }`;
 
-function slowQueries(logPattern, options = {}) {
-  var sRunTime = options.sRunTime;
-  var logs = [];
-  var rateCounter = 0;
-  var startTime = 0;
-  var lastTime = 0;
-  var printTime = 0;
-
-  var int = 1000;
-
-  var msRunTime = sRunTime * 1000;
-  var dups = 0;
-
-  var idxSlowQueries = {};
-  var slowQueries = [];
-
-  var slowQuery = {};
-  var colWidth = {
-    tTotal: 'tTotal'.length,
-    tAvg: 'tAvg'.length,
-    tMax: 'tMax'.length,
-    tMin: 'tMin'.length,
-    Count: 'Count'.length,
-    ns: 'ns'.length,
-    op: 'op'.length,
-    Plan: 'Plan'.length,
-    Shape: 'Shape'.length
-  };
-
-  var op = '';
-  var strShape = '';
-  var idx = '';
-  var db = '';
-  var ns = '';
-  var plan = '';
-  var query = '';
-  var qPlan = {};
-
-
-  while(sRunTime === undefined || sRunTime === null || msRunTime > 0) {
-    logs = getLog(logPattern).result.log;
-    dups = 0;
-    logs.forEach(function(val) {
-      printTime = ISODate(val.t.$date).getTime();
-      if(printTime > lastTime) {
-        if(startTime == 0) { startTime = printTime }
-        rateCounter += 1;
-        if(val.msg == 'Slow query' && !val.attr.ns.match(/^(admin|local|config)\./) && !Object.keys(val.attr.command).includes('hello')) { 
-          if(val.attr.ns.match(/\./)){
-            db = splitNameSpace(val.attr.ns).db;
-          } else {
-            db = ns;
-          }
-
-          op = (val.attr.command.find && 'find')
-            || (val.attr.command.aggregate && 'aggregate')
-            || (val.attr.command.delete && 'delete')
-            || (val.attr.command.delete && 'remove')
-            || (val.attr.command.insert && 'insert')
-            || (val.attr.command.update && 'update');
-          ns = db + '.' + val.attr.command[op];
-          query = (op == 'find' && val.attr.command.filter )
-            || (op == 'insert' && val.attr.command.documents[0])
-            || (op == 'aggregate' && val.attr.command.pipeline)
-            || (op == 'update' && val.attr.command.updates[0].q)
-            || (op == 'delete' && val.attr.command.deletes[0].q)
-            || (op == 'remove' && val.attr.command.q);
-
-          strShape = JSON.stringify(queryShape(query));
-          idx = op + ':' + strShape;
-
-          if(op) {
-            plan = val.attr.planSummary;
-
-            if(!plan) {
-              if(op == 'insert') {
-                plan = '';
-              } else {
-                if (op == 'aggregate' && !Object.keys(query[0]).includes('$match')) {
-                  plan = 'COLLSCAN';
-                } else {
-                  query = (op == 'aggregate' && Object.keys(query[0]).includes('$match' && query[0]['$match'])) || query;
-                  var qPlan = getCollection(ns).find(query).explain('queryPlanner');
-                  plan = (qPlan.queryPlanner.winningPlan.inputStage && qPlan.queryPlanner.winningPlan.inputStage.stage || qPlan.queryPlanner.winningPlan.stage);
-                  if(plan != 'COLLSCAN') {
-                    plan = plan + ' ' + JSON.stringify((qPlan.queryPlanner.winningPlan.inputStage && qPlan.queryPlanner.winningPlan.inputStage.keyPattern || qPlan.queryPlanner.winningPlan.filter));
-                  }
-                }
-              }
-            }
-
-            if(slowQueries[idxSlowQueries[idx]] && slowQueries[idxSlowQueries[idx]].plan != plan) {
-              slowQueries.splice(idxSlowQueries[idx], 1);
-              delete idxSlowQueries[idx];
-            }
-
-            if(Object.keys(idxSlowQueries).includes(idx)){
-              slowQuery = slowQueries[idxSlowQueries[idx]];
-              slowQuery.Count++;
-              slowQuery.tMax = Math.max(slowQuery.maxTime, val.attr.durationMillis);
-              slowQuery.tMin = Math.min(slowQuery.minTime, val.attr.durationMillis);
-              slowQuery.tAvg = slowQuery.totalTime / slowQuery.count;
-              slowQuery.tTotal += val.attr.durationMillis;
-            } else {
-              slowQuery = {};
-              if(op == 'insert') {
-                slowQuery.Shape = '';
-              } else {
-                slowQuery.Shape = strShape;
-              }
-              slowQuery.op = op;
-              slowQuery.ns = ns;
-              slowQuery.Count = 1;
-              slowQuery.tMax = val.attr.durationMillis;
-              slowQuery.tMin = val.attr.durationMillis;
-              slowQuery.tTotal = val.attr.durationMillis;
-              slowQuery.tAvg = slowQuery.tTotal / slowQuery.Count;
-              idxSlowQueries[idx] = slowQueries.push(slowQuery) - 1;
-              colWidth.Shape = Math.max(colWidth.Shape, slowQuery.Shape.length);
-              colWidth.op = Math.max(colWidth.op, op.length);
-              colWidth.ns = Math.max(colWidth.ns, ns.length);
-            }
-            slowQuery.Plan = plan;
-            colWidth.tTime = Math.max(colWidth.tTotal, slowQuery.tTotal.toString().length);
-            colWidth.tAvg = Math.max(colWidth.tAvg, slowQuery.tAvg.toString().length);
-            colWidth.tMax = Math.max(colWidth.tMax, slowQuery.tMax.toString().length);
-            colWidth.tMin = Math.max(colWidth.tMin, slowQuery.tMin.toString().length);
-            colWidth.Count = Math.max(colWidth.Count, slowQuery.Count.toString().length);
-            colWidth.Plan = Math.max(colWidth.Plan, slowQuery.Plan.length);
-          }
-
-        }
-      } else {
-        dups++;
+function findIndexedMatches(pipeline) {
+  var matches = [];
+  var canIndex = true;
+  pipeline.forEach(stage => {
+    if(canIndex){
+      if('$match' in stage) {
+        matches.push(stage);
       }
-    });
-
-    slowQueries.sort((a,b) => b.tTotal - a.tTotal);
-    slowQueries.forEach((q,i) => {
-      idxSlowQueries[q.op + ':' + q.Shape] = i;
-    });
-
-    var table = {};
-    table.headings = [
-      { name: 'tTotal', justify: 'R' },
-      { name: 'tAvg', justify: 'R' },
-      { name: 'tMax', justify: 'R' },
-      { name: 'tMin', justify: 'R' },
-      { name: 'Count', justify: 'R' },
-      { name: 'ns', justify: 'R' },
-      { name: 'op', justify: 'R' },
-      { name: 'Plan', justify: 'R' },
-      { name: 'Shape', justify: 'L' },
-    ];
-    table.data = slowQueries;
-
-    printTable(table);
-    print("\n\n\n");
-
-    if(logs.length < 1024) {
-      int = 1000;
-    } else {
-      int = dups;
+      if(Object.keys(stage)[0].search(/^\$(match|sort|limit)/)) {
+        canIndex = false;
+      }
     }
+  });
 
-    sleep(int);
-    if (sRunTime !== undefined && sRunTime !== null) {
-      msRunTime -= int;
+  return matches;
+}
+///////////////////////////////////////////////////////////////////////////////
+
+usage.findIndexedSort =
+`findIndexedSort(pipeline)
+  Description:
+    Given a pipline, find a $sort stage that'll use an index
+  Parameters:
+    pipeline - aggregation pipeline
+  Returns (example):
+    { a: 1, b: 1, c: -1 }`;
+
+function findIndexedSort(pipeline) {
+  var sort = {};
+  var canIndex = true;
+  pipeline.forEach(stage => {
+    if(canIndex){
+      if('$sort' in stage) {
+        sort = stage['$sort'];
+      }
+      if(Object.keys(stage)[0].search(/^\$(match|sort|limit)/)) {
+        canIndex = false;
+      }
     }
-    lastTime = printTime;
-  }
+  });
+
+  return sort;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
