@@ -1002,7 +1002,7 @@ usage.slowQueries =
     -------------------------------------------------------------------------------------------------------
         25 |   25 |   25 |   25 |     1 | sample_mflix.movies | find | COLLSCAN | {"directors":"string"}`;
 
-function slowQueries(logPattern, options = {}) {
+function slowQueries(logPattern, options = { clearScreen: true}) {
   options.next = true;
 
   var slowQueries = {};
@@ -1056,13 +1056,16 @@ function slowQueries(logPattern, options = {}) {
         && entry.c == 'COMMAND'
         && (! /^(admin|config|local)\./.test(entry.attr.ns) )
         && entry.attr && entry.attr.command
-        && !('profile' in  entry.attr.command)
         && !('pipeline' in entry.attr.command && ('$collStats' in entry.attr.command.pipeline[0]))
         && !('dbstats' in entry.attr.command)
-        && !('dropIndexes' in entry.attr.command)
-        && !('createIndexes' in entry.attr.command)
-        ) {
-//      print("entry:" + JSON.stringify(entry, null, 2));
+        && ( 'find' in  entry.attr.command
+          || 'aggregate' in entry.attr.command
+          || 'update' in entry.attr.command
+          || 'delete' in entry.attr.command
+        )) {
+        if(options.debug) {
+          print("entry:" + JSON.stringify(entry, null, 2));
+        }
 
         // get query shape and sort shape:
         if( 'find' in  entry.attr.command){
@@ -1156,8 +1159,12 @@ function slowQueries(logPattern, options = {}) {
         // sort the queries
         table.data = Object.values(slowQueries).sort((a,b) => b.tTotal - a.tTotal)
 
+        if(options.clearScreen == true) {
+          console.clear();
+        } else {
+          print("\n\n");
+        }
         printTable(table);
-        print("\n\n");
       }
     });
     sleep(1023 - log.length);
