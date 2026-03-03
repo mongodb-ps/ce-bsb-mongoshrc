@@ -597,6 +597,92 @@ function getIndexes(nsPattern, idxPattern) {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+usage.hideIndexes =
+`hideIndexes(nsPattern, idxPattern)
+  Description:
+    Hides indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, fields, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+function hideIndexes(nsPattern, idxPattern) {
+  var ret = {
+    ok: 1,
+    result: []
+  };
+
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
+      var dbObj = {
+        ns: ns,
+        result: []
+      }
+      getCollection(ns).getIndexes().forEach(function(idx) {
+        if (JSON.stringify(idx).match(idxPattern)) {
+          if (!('hidden' in idx) && idx.name != '_id_') {
+            dbObj.result.push({ name: idx.name, result: getCollection(ns).hideIndex(idx.name)});
+          }
+        }
+      });
+      if (dbObj.result.length > 0) {
+        ret.result.push(dbObj);
+       }
+    });
+  } catch (error) {
+      ret.ok = 0;
+      ret.err = error;
+  }
+    return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+usage.unHideIndexes =
+`hideIndexes(nsPattern, idxPattern)
+  Description:
+    Hides indexes based upon the nsPattern (regex).
+    idxPattern allows you to scan the index for the name, fields, etc.
+  Parameters:
+    nsPattern - regex/string to limit namespaces
+    idxPattern - regex/string to limit indexes
+  Returns:
+    { ok: ..., err: <error>, results: [ { ns: <db>.<col>, indexes: [ <index>, ... ] } ] }`;
+
+function unhideIndexes(nsPattern, idxPattern) {
+  var ret = {
+    ok: 1,
+    result: []
+  };
+
+  try {
+    getNameSpaces(nsPattern).results.forEach(function(ns) {
+      var dbObj = {
+        ns: ns,
+        result: []
+      }
+      getCollection(ns).getIndexes().forEach(function(idx) {
+        if (JSON.stringify(idx).match(idxPattern)) {
+          if (('hidden' in idx) && idx.name != '_id_') {
+            dbObj.result.push({ name: idx.name, result: getCollection(ns).unhideIndex(idx.name)});
+          }
+        }
+      });
+      if (dbObj.result.length > 0) {
+        ret.result.push(dbObj);
+       }
+    });
+  } catch (error) {
+      ret.ok = 0;
+      ret.err = error;
+  }
+    return ret;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 usage.getIndexStats =
 `getIndexStats(nsPattern, idxPattern)
   Description:
